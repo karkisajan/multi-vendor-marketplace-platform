@@ -49,6 +49,9 @@ export class AuthService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  /**
+   * Verifies that password and confirmPassword match; throws UnauthorizedException if not.
+   */
   private checkPasswordMatches(
     registrationDto: RegisterCustomerDto | RegisterVendorDto,
   ): void {
@@ -59,6 +62,9 @@ export class AuthService {
     }
   }
 
+  /**
+   * Checks whether a user with the given email already exists; throws ConflictException if found.
+   */
   private async checkEmailAlreadyExist(email: string): Promise<void> {
     const userExists: User | null = await this.userRepository.findUser(email);
 
@@ -67,6 +73,9 @@ export class AuthService {
     }
   }
 
+  /**
+   * Issues JWT tokens via JwtTokenService and shapes the login/refresh response with role-specific profile data.
+   */
   private async jwtTokenResponse(user: User, role: UserRoleEnum) {
     const jwtTokenRes = await this.jwtTokenService.jwtSignToken(
       user.id,
@@ -98,7 +107,11 @@ export class AuthService {
     };
   }
 
-  /* ------ POST - Register user (Customer) */
+  /**
+   * ------ POST - Register user (Customer)
+   * Registers a new customer account and creates a customer profile within a single database transaction.
+   * Emits a CUSTOMER_REGISTERED event after successful persistence.
+   */
   async registerCustomer(registerCustomerDto: RegisterCustomerDto) {
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
@@ -156,7 +169,11 @@ export class AuthService {
     return result;
   }
 
-  /* ------ POST - Register user (Customer) */
+  /**
+   * ------ POST - Register user (Vendor)
+   * Registers a new vendor account and creates a vendor profile within a single database transaction.
+   * Emits a VENDOR_REGISTERED event after successful persistence.
+   */
   async registerVendor(registerVendorDto: RegisterVendorDto) {
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
@@ -188,7 +205,7 @@ export class AuthService {
           );
 
         return {
-          message: 'User registered successfully.',
+          message: 'Vendor registered successfully.',
           id: savedVendor.id,
           email: savedVendor.email,
           role: savedVendor.role,
@@ -214,7 +231,10 @@ export class AuthService {
     return result;
   }
 
-  /* ------ POST - login user */
+  /**
+   * ------ POST - login user
+   * Authenticates an existing customer or vendor by email and password; returns JWT tokens and profile on success.
+   */
   async loginUser(loginUserDto: LoginUserDto) {
     const user: User | null = await this.userRepository.findUser(
       normalizedEmail(loginUserDto.email),
@@ -236,10 +256,15 @@ export class AuthService {
     return await this.jwtTokenResponse(user, user.role);
   }
 
-  /* ------- POST - refresh-token */
+  /**
+   * ------ POST - refresh-token
+   * Validates the refresh token signature, confirms token ownership against the stored hash,
+   * verifies expiration, and issues new access and refresh tokens for the authenticated user.
+   */
   async refreshToken(refreshTokenDto: RefreshTokenDto) {
     const { refreshToken } = refreshTokenDto;
 
+    /* Verify the jwtTokenKey */
     const payload: JwtPayload = this.jwtService.verify<JwtPayload>(
       refreshToken,
       {
@@ -247,6 +272,7 @@ export class AuthService {
       },
     );
 
+    /* GET user and verify the user-password */
     const user: User | null = await this.userRepository.findUser(payload.email);
     if (!user) {
       throw new UnauthorizedException('Invalid email or password.');
@@ -260,6 +286,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    /* Verify weather the JwtTokenKey is past the current date */
     const currentDate: Date = new Date(Date.now());
     if (currentDate > user.refreshTokenExpiryDate) {
       throw new UnauthorizedException('Refresh token has expired.');
@@ -268,7 +295,10 @@ export class AuthService {
     return await this.jwtTokenResponse(user, user.role);
   }
 
-  /* ------ POST - forget password */
+  /**
+   * ------ POST - forget password
+   * Generates a short-lived password reset token for the user, persists its hash, and emits PASSWORD_RESET with the reset link.
+   */
   async forgetPassword(forgetPasswordDto: ForgetPasswordDto) {
     const user: User | null = await this.userRepository.findUser(
       normalizedEmail(forgetPasswordDto.email),
@@ -277,6 +307,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email. Please try again.');
     }
 
+    /**
+     * Verify the JwtToken is valid.
+     * Hash the verified token key and store it in database.
+     */
     const payload: JwtPayload = {
       id: user.id,
       email: user.email,
@@ -308,7 +342,10 @@ export class AuthService {
     };
   }
 
-  /* ------ POST - reset password */
+  /**
+   * ------ POST - reset password
+   * Validates the reset token and expiry, updates the user password, clears reset token fields, and emits PASSWORD_RESET_SUCCESSFUL.
+   */
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const payload: JwtPayload = this.jwtService.verify(
       resetPasswordDto.resetToken,

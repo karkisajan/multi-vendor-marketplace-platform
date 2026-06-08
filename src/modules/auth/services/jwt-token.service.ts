@@ -17,7 +17,9 @@ export class JwtTokenService {
     private readonly configService: ConfigService,
   ) {}
 
-  /* Sign JWT-token function */
+  /**
+   * Signs access and refresh JWT tokens, persists the hashed refresh token with expiry on the user record, and returns both tokens.
+   */
   async jwtSignToken(id: string, email: string) {
     const jwtPayload: JwtPayload = {
       id: id,

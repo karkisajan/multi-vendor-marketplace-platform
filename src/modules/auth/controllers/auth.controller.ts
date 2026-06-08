@@ -18,41 +18,59 @@ import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  /* POST - Register user (Customer) */
+  /**
+   * ------ POST - Register user (Customer)
+   * Accepts customer registration payload and delegates to AuthService.
+   */
   @ApiRegisterUser()
   @Post('/register')
   async registerCustomer(@Body() registerUserDto: RegisterCustomerDto) {
     return await this.authService.registerCustomer(registerUserDto);
   }
 
-  /* POST - Register user (Vendor) */
+  /**
+   * ------ POST - Register user (Vendor)
+   * Accepts vendor registration payload and delegates to AuthService.
+   */
   @ApiRegisterUser()
   @Post('/vendor/register')
   async registerVendor(@Body() registerUserDto: RegisterVendorDto) {
     return await this.authService.registerVendor(registerUserDto);
   }
 
-  /* POST - login user */
+  /**
+   * ------ POST - login user
+   * Accepts login credentials and delegates authentication to AuthService.
+   */
   @ApiLoginUser()
   @Post('/login')
   async loginUser(@Body() loginUserDto: LoginUserDto) {
     return await this.authService.loginUser(loginUserDto);
   }
 
-  /* POST - refresh-token */
+  /**
+   * ------ POST - refresh-token
+   * Accepts a refresh token and delegates token renewal to AuthService.
+   */
   @ApiRefreshToken()
   @Post('/refresh-token')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     return await this.authService.refreshToken(refreshTokenDto);
   }
 
-  /* POST - forget password */
+  /**
+   * ------ POST - forget password
+   * Accepts the user email and delegates password reset initiation to AuthService.
+   */
   @Post('/forget-password')
   async forgetPassword(@Body() forgetPasswordDto: ForgetPasswordDto) {
     return await this.authService.forgetPassword(forgetPasswordDto);
   }
 
-  /* POST - reset password */
+  /**
+   * ------ POST - reset password
+   * Accepts the reset token and new password; delegates password update to AuthService.
+   */
   @Post('/reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return await this.authService.resetPassword(resetPasswordDto);
