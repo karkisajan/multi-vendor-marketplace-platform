@@ -5,9 +5,11 @@ import { RegisterCustomerDto } from 'src/modules/users/dto/register-customer.dto
 import { LoginUserDto } from 'src/modules/users/dto/login-user.dto';
 import { RefreshTokenDto } from 'src/modules/users/dto/refresh-token.dto';
 import {
+  ApiForgetPassword,
   ApiLoginUser,
   ApiRefreshToken,
   ApiRegisterUser,
+  ApiResetPassword,
 } from 'src/modules/users/decorators/auth-swagger.decorator';
 import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
 import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
@@ -62,6 +64,7 @@ export class AuthController {
    * ------ POST - forget password
    * Accepts the user email and delegates password reset initiation to AuthService.
    */
+  @ApiForgetPassword()
   @Post('/forget-password')
   async forgetPassword(@Body() forgetPasswordDto: ForgetPasswordDto) {
     return await this.authService.forgetPassword(forgetPasswordDto);
@@ -71,6 +74,7 @@ export class AuthController {
    * ------ POST - reset password
    * Accepts the reset token and new password; delegates password update to AuthService.
    */
+  @ApiResetPassword()
   @Post('/reset-password')
   async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
     return await this.authService.resetPassword(resetPasswordDto);

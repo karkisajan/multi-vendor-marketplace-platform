@@ -3,6 +3,8 @@ import { ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { RegisterCustomerDto } from 'src/modules/users/dto/register-customer.dto';
 import { LoginUserDto } from 'src/modules/users/dto/login-user.dto';
 import { RefreshTokenDto } from 'src/modules/users/dto/refresh-token.dto';
+import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
+import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
 
 export function ApiRegisterUser() {
   return applyDecorators(
@@ -49,6 +51,44 @@ export function ApiRefreshToken() {
     ApiResponse({
       status: 401,
       description: 'Invalid or expired refresh token',
+    }),
+  );
+}
+
+export function ApiForgetPassword() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Request password reset link' }),
+    ApiBody({ type: ForgetPasswordDto }),
+    ApiResponse({
+      status: 200,
+      description: 'Password reset link has been sent to your email.',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Bad request / Validation error',
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Invalid email',
+    }),
+  );
+}
+
+export function ApiResetPassword() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Reset password with token' }),
+    ApiBody({ type: ResetPasswordDto }),
+    ApiResponse({
+      status: 200,
+      description: 'Your password has been successfully reset',
+    }),
+    ApiResponse({
+      status: 400,
+      description: 'Bad request / Validation error',
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Invalid email or expired reset token',
     }),
   );
 }
