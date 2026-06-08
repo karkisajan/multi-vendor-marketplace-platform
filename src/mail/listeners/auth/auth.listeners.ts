@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { MAIL_EVENTS } from 'src/mail/events/mail-event-names';
 import {
+  ForgetPasswordEvent,
   UserRegistrationEvent,
   VendorRegistrationEvent,
 } from 'src/mail/events/mail.events';
@@ -32,7 +33,20 @@ export class AuthListener {
       await this.mailService.sendVendorRegistrationEmail(event);
     } catch (error) {
       this.logger.error(
-        `Failed tp send welcome email to ${event.email}`,
+        `Failed to send welcome email to ${event.email}`,
+        error,
+      );
+    }
+  }
+
+  /* Customer password reset event */
+  @OnEvent(MAIL_EVENTS.PASSWORD_RESET_SUCCESSFUL)
+  async handleForgetPasswordEvent(event: ForgetPasswordEvent) {
+    try {
+      await this.mailService.sendForgetPasswordLinkEmail(event);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send reset password link to ${event.email}`,
         error,
       );
     }

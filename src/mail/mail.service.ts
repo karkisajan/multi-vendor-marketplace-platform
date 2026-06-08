@@ -36,4 +36,33 @@ export class MailService {
       },
     });
   }
+
+  /* Send forget password email link for customer */
+  async sendForgetPasswordLinkEmail(user: {
+    email: string;
+    username: string;
+    resetPasswordToken: string;
+  }) {
+    await this.mailerService.sendMail({
+      to: user.email,
+      subject: `Password reset request`,
+      template: './forget-password',
+      context: {
+        username: user.username,
+        resetLink: user.resetPasswordToken,
+      },
+    });
+  }
+
+  /* Send password reset successful link for customer */
+  async sendPasswordResetSuccessful(user: { email: string; username: string }) {
+    await this.mailerService.sendMail({
+      to: user.email,
+      subject: `Password reset successful`,
+      template: './password-reset-successful',
+      context: {
+        username: user.username,
+      },
+    });
+  }
 }

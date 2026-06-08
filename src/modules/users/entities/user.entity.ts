@@ -48,10 +48,10 @@ export class User {
   refreshTokenExpiryDate: Date;
 
   @Column({ nullable: true, type: 'text' })
-  resetPassword: string;
+  resetPasswordToken: string | null;
 
   @Column({ nullable: true, type: 'timestamptz' })
-  resetPasswordExpiryDate: Date;
+  resetPasswordTokenExpiryDate: Date | null;
 
   @CreateDateColumn()
   createdAt: Date;

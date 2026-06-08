@@ -10,6 +10,8 @@ import {
   ApiRegisterUser,
 } from 'src/modules/users/decorators/auth-swagger.decorator';
 import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
+import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
+import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
 
 @ApiTags('Auth')
 @Controller('/auth/users')
@@ -42,5 +44,17 @@ export class AuthController {
   @Post('/refresh-token')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     return await this.authService.refreshToken(refreshTokenDto);
+  }
+
+  /* POST - forget password */
+  @Post('/forget-password')
+  async forgetPassword(@Body() forgetPasswordDto: ForgetPasswordDto) {
+    return await this.authService.forgetPassword(forgetPasswordDto);
+  }
+
+  /* POST - reset password */
+  @Post('/reset-password')
+  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
+    return await this.authService.resetPassword(resetPasswordDto);
   }
 }

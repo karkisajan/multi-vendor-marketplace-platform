@@ -16,13 +16,19 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MAIL_EVENTS } from 'src/mail/events/mail-event-names';
-import { UserRegistrationEvent } from 'src/mail/events/mail.events';
+import {
+  ForgetPasswordEvent,
+  PasswordResetSuccessful,
+  UserRegistrationEvent,
+} from 'src/mail/events/mail.events';
 import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
 import { VendorProfileRepository } from 'src/modules/users/repositories/vendor-profile.repository';
 import { VendorProfile } from 'src/modules/users/entities/vendor-profile.entity';
 import { RegisterCustomerDto } from 'src/modules/users/dto/register-customer.dto';
 import { CustomerProfile } from 'src/modules/users/entities/customer-profile.entity';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
+import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
+import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
 
 interface JwtPayload {
   id: string;
@@ -61,7 +67,7 @@ export class AuthService {
     }
   }
 
-  private async jwtTokenResponse(user: User) {
+  private async jwtTokenResponse(user: User, role: UserRoleEnum) {
     const jwtTokenRes = await this.jwtTokenService.jwtSignToken(
       user.id,
       user.email,
@@ -72,18 +78,27 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        userProfile: {
-          id: user.customerProfile.id,
-          firstName: user.customerProfile.firstName,
-          lastName: user.customerProfile.lastName,
-          profileUrl: user.customerProfile.profileUrl,
-          phoneNumber: user.customerProfile.phoneNumber,
-        },
+        role: user.role,
+        profile:
+          role === UserRoleEnum.CUSTOMER
+            ? {
+                id: user.customerProfile.id,
+                firstName: user.customerProfile.firstName,
+                lastName: user.customerProfile.lastName,
+                profileUrl: user.customerProfile.profileUrl,
+                phoneNumber: user.customerProfile.phoneNumber,
+              }
+            : {
+                id: user.vendorProfile.id,
+                firstName: user.vendorProfile.businessName,
+                profileUrl: user.vendorProfile.businessProfileUrl,
+                phoneNumber: user.vendorProfile.phoneNumber,
+              },
       },
     };
   }
 
-  /* POST - Register user (Customer) */
+  /* ------ POST - Register user (Customer) */
   async registerCustomer(registerCustomerDto: RegisterCustomerDto) {
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
@@ -141,9 +156,8 @@ export class AuthService {
     return result;
   }
 
-  /* POST - Register user (Customer) */
+  /* ------ POST - Register user (Customer) */
   async registerVendor(registerVendorDto: RegisterVendorDto) {
-    console.log('This is the register vendor', registerVendorDto);
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
         /* Check whether the confirm password and passwords should match */
@@ -200,7 +214,7 @@ export class AuthService {
     return result;
   }
 
-  /* POST - login user */
+  /* ------ POST - login user */
   async loginUser(loginUserDto: LoginUserDto) {
     const user: User | null = await this.userRepository.findUser(
       normalizedEmail(loginUserDto.email),
@@ -219,10 +233,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    return await this.jwtTokenResponse(user);
+    return await this.jwtTokenResponse(user, user.role);
   }
 
-  /* POST - refresh-token */
+  /* ------- POST - refresh-token */
   async refreshToken(refreshTokenDto: RefreshTokenDto) {
     const { refreshToken } = refreshTokenDto;
 
@@ -251,6 +265,93 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token has expired.');
     }
 
-    return await this.jwtTokenResponse(user);
+    return await this.jwtTokenResponse(user, user.role);
+  }
+
+  /* ------ POST - forget password */
+  async forgetPassword(forgetPasswordDto: ForgetPasswordDto) {
+    const user: User | null = await this.userRepository.findUser(
+      normalizedEmail(forgetPasswordDto.email),
+    );
+    if (!user) {
+      throw new UnauthorizedException('Invalid email. Please try again.');
+    }
+
+    const payload: JwtPayload = {
+      id: user.id,
+      email: user.email,
+    };
+    const resetToken: string = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_PASSWORD_RESET_SECRET_KEY'),
+      expiresIn: '15m',
+    });
+
+    const hashedResetPasswordToken: string = await argon.hash(resetToken);
+    const resetPasswordExpiryDate: Date = new Date(
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    );
+    user.resetPasswordToken = hashedResetPasswordToken;
+    user.resetPasswordTokenExpiryDate = resetPasswordExpiryDate;
+    await this.userRepository.save(user);
+
+    this.eventEmitter.emit(
+      MAIL_EVENTS.PASSWORD_RESET,
+      new ForgetPasswordEvent(
+        user.email,
+        `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+        resetToken,
+      ),
+    );
+
+    return {
+      message: 'Password reset link has been sent to your email.',
+    };
+  }
+
+  /* ------ POST - reset password */
+  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+    const payload: JwtPayload = this.jwtService.verify(
+      resetPasswordDto.resetToken,
+      {
+        secret: this.configService.get<string>('JWT_PASSWORD_RESET_SECRET_KEY'),
+      },
+    );
+
+    const user: User | null = await this.userRepository.findUser(
+      normalizedEmail(payload.email),
+    );
+    if (!user) {
+      throw new UnauthorizedException('Invalid email. Please try again.');
+    }
+
+    if (
+      user &&
+      (!user.resetPasswordTokenExpiryDate ||
+        user.resetPasswordTokenExpiryDate < new Date(Date.now()))
+    ) {
+      throw new UnauthorizedException(
+        'The reset token has expired. Please try again.',
+      );
+    }
+
+    const hashedNewPassword: string = await argon.hash(
+      resetPasswordDto.newPassword,
+    );
+    user.password = hashedNewPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordTokenExpiryDate = null;
+    await this.userRepository.save(user);
+
+    this.eventEmitter.emit(
+      MAIL_EVENTS.PASSWORD_RESET_SUCCESSFUL,
+      new PasswordResetSuccessful(
+        user.email,
+        `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+      ),
+    );
+
+    return {
+      message: 'Your password has been successfully reset',
+    };
   }
 }
