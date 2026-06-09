@@ -20,12 +20,12 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:user": "ts-node -r tsconfig-paths/register ./src/database/seed/user.seed.ts",
     "seed:all": "npm run seed:user",
-    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli",
+    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:generate": "npm run typeorm -- -d src/database/data-source.ts migration:generate",
+    "migration:create": "npm run typeorm -- migration:create src/database/migrations/",
     "migration:run": "npm run typeorm -- -d src/database/data-source.ts migration:run",
     "migration:revert": "npm run typeorm -- -d src/database/data-source.ts migration:revert",
     "migration:show": "npm run typeorm -- -d src/database/data-source.ts migration:show",
-    "migration:create": "npm run typeorm -- migration:create",
     "prepare": "husky"
   },
   "dependencies": {

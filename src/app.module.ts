@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { join } from 'path';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -31,8 +32,9 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
         username: configService.get<string>('DB_USERNAME'),
         password: configService.get<string>('DB_PASSWORD'),
         database: configService.get<string>('DB_NAME'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get<string>('NODE_ENV') === 'development',
+        entities: [join(__dirname, '**', '*.entity.{ts,js}')],
+        migrations: [join(__dirname, 'database', 'migrations', '*.{ts,js}')],
+        synchronize: false,
         namingStrategy: new SnakeNamingStrategy(),
         autoLoadEntities: true,
       }),
