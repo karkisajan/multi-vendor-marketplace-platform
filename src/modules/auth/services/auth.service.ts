@@ -19,9 +19,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
 import {
   CustomerForgetPasswordEvent,
-  CustomerPasswordResetEvent,
-  ForgetPasswordEvent,
-  PasswordResetSuccessful,
+  CustomerPasswordResetSuccessfulEvent,
   UserLoggedInEvent,
   UserRegistrationEvent,
 } from 'src/mail/events/auth.events';
@@ -273,8 +271,10 @@ export class AuthService {
 
   /**
    * ------ POST - refresh-token
-   * Validates the refresh token signature, confirms token ownership against the stored hash,
-   * verifies expiration, and issues new access and refresh tokens for the authenticated user.
+   * Exchanges a valid refresh token for a new access and refresh token pair without requiring re-login.
+   * Verifies the JWT signature, confirms the token matches the argon2-hashed value stored on the user,
+   * checks the stored expiry date, then re-issues tokens via jwtTokenResponse.
+   * @throws UnauthorizedException when the user is not found, the token hash does not match, or the token has expired
    */
   async refreshToken(refreshTokenDto: RefreshTokenDto) {
     const { refreshToken } = refreshTokenDto;
@@ -315,7 +315,10 @@ export class AuthService {
 
   /**
    * ------ POST - forget password
-   * Generates a short-lived password reset token for the user, persists its hash, and emits PASSWORD_RESET with the reset link.
+   * Initiates password recovery for an existing user by email.
+   * Signs a short-lived JWT reset token (15m), persists its argon2 hash with a 7-day expiry window on the user record,
+   * and emits CUSTOMER_FORGET_PASSWORD for customers (triggers the reset email and audit log).
+   * @throws UnauthorizedException when no user exists for the given email
    */
   async forgetPassword(
     forgetPasswordDto: ForgetPasswordDto,
@@ -345,15 +348,6 @@ export class AuthService {
     user.resetPasswordTokenExpiryDate = resetPasswordExpiryDate;
     await this.userRepository.save(user);
 
-    this.eventEmitter.emit(
-      AUTH_EVENTS.PASSWORD_RESET,
-      new ForgetPasswordEvent(
-        user.email,
-        `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
-        resetToken,
-      ),
-    );
-
     if (user.role === UserRoleEnum.CUSTOMER) {
       this.eventEmitter.emit(
         AUTH_EVENTS.CUSTOMER_FORGET_PASSWORD,
@@ -361,6 +355,7 @@ export class AuthService {
           user.id,
           user.email,
           `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+          resetToken,
           userIpAddress,
         ),
       );
@@ -373,7 +368,10 @@ export class AuthService {
 
   /**
    * ------ POST - reset password
-   * Validates the reset token and expiry, updates the user password, clears reset token fields, and emits PASSWORD_RESET_SUCCESSFUL.
+   * Completes password recovery by validating the reset JWT, verifying the stored token hash and expiry,
+   * hashing the new password, and clearing reset token fields from the user record.
+   * Emits CUSTOMER_PASSWORD_RESET_SUCCESSFUL for customers (triggers the confirmation email and audit log).
+   * @throws UnauthorizedException when the user is not found, no reset was requested, the token is invalid, or the token has expired
    */
   async resetPassword(
     resetPasswordDto: ResetPasswordDto,
@@ -424,18 +422,10 @@ export class AuthService {
     user.resetPasswordTokenExpiryDate = null;
     await this.userRepository.save(user);
 
-    this.eventEmitter.emit(
-      AUTH_EVENTS.PASSWORD_RESET_SUCCESSFUL,
-      new PasswordResetSuccessful(
-        user.email,
-        `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
-      ),
-    );
-
     if (user.role === UserRoleEnum.CUSTOMER) {
       this.eventEmitter.emit(
-        AUTH_EVENTS.CUSTOMER_PASSWORD_RESET,
-        new CustomerPasswordResetEvent(
+        AUTH_EVENTS.CUSTOMER_PASSWORD_RESET_SUCCESSFUL,
+        new CustomerPasswordResetSuccessfulEvent(
           user.id,
           user.email,
           `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,

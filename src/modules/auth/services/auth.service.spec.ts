@@ -19,9 +19,7 @@ import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
 import {
   CustomerForgetPasswordEvent,
-  CustomerPasswordResetEvent,
-  ForgetPasswordEvent,
-  PasswordResetSuccessful,
+  CustomerPasswordResetSuccessfulEvent,
   UserLoggedInEvent,
   UserRegistrationEvent,
 } from 'src/mail/events/auth.events';
@@ -432,7 +430,7 @@ describe('AuthService', () => {
   });
 
   describe('forgetPassword', () => {
-    it('should generate reset token, save user, and emit PASSWORD_RESET when email exists', async () => {
+    it('should generate reset token, save user, and emit CUSTOMER_FORGET_PASSWORD when email exists', async () => {
       userRepository.findUser.mockResolvedValue(customerUser);
       jwtService.sign.mockReturnValue('reset-token');
       userRepository.save.mockResolvedValue(customerUser);
@@ -456,13 +454,10 @@ describe('AuthService', () => {
         }),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
-        AUTH_EVENTS.PASSWORD_RESET,
-        expect.any(ForgetPasswordEvent),
-      );
-      expect(eventEmitter.emit).toHaveBeenCalledWith(
         AUTH_EVENTS.CUSTOMER_FORGET_PASSWORD,
         expect.any(CustomerForgetPasswordEvent),
       );
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
     });
 
     it('should throw UnauthorizedException when email is not found', async () => {
@@ -496,7 +491,7 @@ describe('AuthService', () => {
       });
     });
 
-    it('should update password, clear reset fields, and emit PASSWORD_RESET_SUCCESSFUL when token is valid', async () => {
+    it('should update password, clear reset fields, and emit CUSTOMER_PASSWORD_RESET_SUCCESSFUL when token is valid', async () => {
       userRepository.findUser.mockResolvedValue(userWithResetToken);
       userRepository.save.mockResolvedValue(userWithResetToken);
 
@@ -516,13 +511,10 @@ describe('AuthService', () => {
         }),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
-        AUTH_EVENTS.PASSWORD_RESET_SUCCESSFUL,
-        expect.any(PasswordResetSuccessful),
+        AUTH_EVENTS.CUSTOMER_PASSWORD_RESET_SUCCESSFUL,
+        expect.any(CustomerPasswordResetSuccessfulEvent),
       );
-      expect(eventEmitter.emit).toHaveBeenCalledWith(
-        AUTH_EVENTS.CUSTOMER_PASSWORD_RESET,
-        expect.any(CustomerPasswordResetEvent),
-      );
+      expect(eventEmitter.emit).toHaveBeenCalledTimes(1);
     });
 
     it('should throw UnauthorizedException when user is not found', async () => {

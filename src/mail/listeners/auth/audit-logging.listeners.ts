@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
 import {
   CustomerForgetPasswordEvent,
-  CustomerPasswordResetEvent,
+  CustomerPasswordResetSuccessfulEvent,
   UserLoggedInEvent,
   UserRegistrationEvent,
 } from 'src/mail/events/auth.events';
@@ -65,11 +65,13 @@ export class AuditLoggingListener {
     }
   }
 
-  @OnEvent(AUTH_EVENTS.CUSTOMER_PASSWORD_RESET)
-  async handleCustomerPasswordReset(event: CustomerPasswordResetEvent) {
+  @OnEvent(AUTH_EVENTS.CUSTOMER_PASSWORD_RESET_SUCCESSFUL)
+  async handleCustomerPasswordReset(
+    event: CustomerPasswordResetSuccessfulEvent,
+  ) {
     try {
       await this.auditLogRepository.createAuditLog(
-        'CUSTOMER_PASSWORD_RESET',
+        'CUSTOMER_PASSWORD_RESET_SUCCESSFUL',
         event.userId,
         event.email,
         event.ipAddress,

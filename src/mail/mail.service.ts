@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
+import { CustomerPasswordResetSuccessfulEvent } from './events/auth.events';
 
 @Injectable()
 export class MailService {
@@ -57,7 +58,9 @@ export class MailService {
   }
 
   /* Send password reset successful link for customer */
-  async sendPasswordResetSuccessful(user: { email: string; username: string }) {
+  async sendPasswordResetSuccessful(
+    user: CustomerPasswordResetSuccessfulEvent,
+  ) {
     await this.mailerService.sendMail({
       to: user.email,
       subject: `Password reset successful`,

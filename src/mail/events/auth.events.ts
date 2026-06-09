@@ -21,11 +21,12 @@ export class CustomerForgetPasswordEvent {
     public readonly userId: string,
     public readonly email: string,
     public readonly username: string,
+    public readonly resetPasswordToken: string,
     public readonly ipAddress: string,
   ) {}
 }
 
-export class CustomerPasswordResetEvent {
+export class CustomerPasswordResetSuccessfulEvent {
   constructor(
     public readonly userId: string,
     public readonly email: string,
@@ -38,20 +39,5 @@ export class VendorRegistrationEvent {
   constructor(
     public readonly email: string,
     public readonly businessName: string,
-  ) {}
-}
-
-export class ForgetPasswordEvent {
-  constructor(
-    public readonly email: string,
-    public readonly username: string,
-    public readonly resetPasswordToken: string,
-  ) {}
-}
-
-export class PasswordResetSuccessful {
-  constructor(
-    public readonly email: string,
-    public readonly username: string,
   ) {}
 }
