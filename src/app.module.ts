@@ -13,6 +13,7 @@ import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { JwtModule } from '@nestjs/jwt';
 import { AuthenticationMiddleware } from './middlewares/authentication.middleware';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -42,6 +43,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     UsersModule,
     CartModule,
     OrdersModule,
+    AuditLogsModule,
   ],
   providers: [
     {

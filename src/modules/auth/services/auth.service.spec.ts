@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -12,12 +16,15 @@ import { VendorProfileRepository } from '../../users/repositories/vendor-profile
 import { JwtTokenService } from './jwt-token.service';
 import { User } from 'src/modules/users/entities/user.entity';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
-import { MAIL_EVENTS } from 'src/mail/events/mail-event-names';
+import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
 import {
+  CustomerForgetPasswordEvent,
+  CustomerPasswordResetEvent,
   ForgetPasswordEvent,
   PasswordResetSuccessful,
+  UserLoggedInEvent,
   UserRegistrationEvent,
-} from 'src/mail/events/mail.events';
+} from 'src/mail/events/auth.events';
 import { RegisterCustomerDto } from 'src/modules/users/dto/register-customer.dto';
 import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
 
@@ -94,6 +101,8 @@ describe('AuthService', () => {
     },
   } as User;
 
+  const userIpAddress = '127.0.0.1';
+
   const vendorUser: User = {
     id: 'vendor-id',
     email: 'vendor@example.com',
@@ -164,7 +173,10 @@ describe('AuthService', () => {
         phoneNumber: '+9779812345678',
       });
 
-      const result = await service.registerCustomer(registerCustomerDto);
+      const result = await service.registerCustomer(
+        registerCustomerDto,
+        userIpAddress,
+      );
 
       expect(result).toEqual({
         message: 'User registered successfully.',
@@ -185,18 +197,18 @@ describe('AuthService', () => {
         expect.any(Object),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
-        MAIL_EVENTS.CUSTOMER_REGISTERED,
+        AUTH_EVENTS.CUSTOMER_REGISTERED,
         expect.any(UserRegistrationEvent),
       );
     });
 
-    it('should throw UnauthorizedException when passwords do not match', async () => {
+    it('should throw BadRequestException when passwords do not match', async () => {
       const dto = { ...registerCustomerDto, confirmPassword: 'Mismatch@123' };
 
-      await expect(service.registerCustomer(dto)).rejects.toThrow(
-        new UnauthorizedException(
-          'Passwords does not match. Please try again.',
-        ),
+      await expect(
+        service.registerCustomer(dto, userIpAddress),
+      ).rejects.toThrow(
+        new BadRequestException('Passwords does not match. Please try again.'),
       );
       expect(userRepository.registerUser).not.toHaveBeenCalled();
     });
@@ -205,10 +217,10 @@ describe('AuthService', () => {
       userRepository.findUser.mockResolvedValue(customerUser);
 
       await expect(
-        service.registerCustomer(registerCustomerDto),
+        service.registerCustomer(registerCustomerDto, userIpAddress),
       ).rejects.toThrow(ConflictException);
       await expect(
-        service.registerCustomer(registerCustomerDto),
+        service.registerCustomer(registerCustomerDto, userIpAddress),
       ).rejects.toThrow('User with this email already exists.');
     });
   });
@@ -231,7 +243,8 @@ describe('AuthService', () => {
       const result = await service.registerVendor(registerVendorDto);
 
       expect(result).toEqual({
-        message: 'Vendor registered successfully.',
+        message:
+          'Vendor business account registered successfully. Please wait for your approval.',
         id: 'vendor-id',
         email: 'vendor@example.com',
         role: UserRoleEnum.VENDOR,
@@ -248,19 +261,14 @@ describe('AuthService', () => {
         expect.any(Object),
         UserRoleEnum.VENDOR,
       );
-      expect(eventEmitter.emit).toHaveBeenCalledWith(
-        MAIL_EVENTS.VENDOR_REGISTERED,
-        expect.any(UserRegistrationEvent),
-      );
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
-    it('should throw UnauthorizedException when passwords do not match', async () => {
+    it('should throw BadRequestException when passwords do not match', async () => {
       const dto = { ...registerVendorDto, confirmPassword: 'Mismatch@123' };
 
       await expect(service.registerVendor(dto)).rejects.toThrow(
-        new UnauthorizedException(
-          'Passwords does not match. Please try again.',
-        ),
+        new BadRequestException('Passwords does not match. Please try again.'),
       );
       expect(userRepository.registerUser).not.toHaveBeenCalled();
     });
@@ -278,10 +286,13 @@ describe('AuthService', () => {
     it('should return tokens and customer profile when credentials are valid', async () => {
       userRepository.findUser.mockResolvedValue(customerUser);
 
-      const result = await service.loginUser({
-        email: 'john.doe@example.com',
-        password: 'Password@123',
-      });
+      const result = await service.loginUser(
+        {
+          email: 'john.doe@example.com',
+          password: 'Password@123',
+        },
+        userIpAddress,
+      );
 
       expect(result).toEqual({
         message: 'User logged in successfully.',
@@ -304,32 +315,43 @@ describe('AuthService', () => {
         'hashed-password',
         'Password@123',
       );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTH_EVENTS.CUSTOMER_LOGGED_IN,
+        expect.any(UserLoggedInEvent),
+      );
     });
 
     it('should return tokens and vendor profile when vendor credentials are valid', async () => {
       userRepository.findUser.mockResolvedValue(vendorUser);
 
-      const result = await service.loginUser({
-        email: 'vendor@example.com',
-        password: 'Password@123',
-      });
+      const result = await service.loginUser(
+        {
+          email: 'vendor@example.com',
+          password: 'Password@123',
+        },
+        userIpAddress,
+      );
 
       expect(result.user.profile).toEqual({
         id: 'vendor-profile-id',
-        firstName: 'Acme Corp',
+        businessName: 'Acme Corp',
         profileUrl: 'https://example.com/business.jpg',
         phoneNumber: '+9779812345678',
       });
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException when user is not found', async () => {
       userRepository.findUser.mockResolvedValue(null);
 
       await expect(
-        service.loginUser({
-          email: 'missing@example.com',
-          password: 'Password@123',
-        }),
+        service.loginUser(
+          {
+            email: 'missing@example.com',
+            password: 'Password@123',
+          },
+          userIpAddress,
+        ),
       ).rejects.toThrow('Invalid email or password.');
     });
 
@@ -338,10 +360,13 @@ describe('AuthService', () => {
       (argon.verify as jest.Mock).mockResolvedValue(false);
 
       await expect(
-        service.loginUser({
-          email: 'john.doe@example.com',
-          password: 'WrongPassword@123',
-        }),
+        service.loginUser(
+          {
+            email: 'john.doe@example.com',
+            password: 'WrongPassword@123',
+          },
+          userIpAddress,
+        ),
       ).rejects.toThrow('Invalid email or password.');
     });
   });
@@ -381,7 +406,7 @@ describe('AuthService', () => {
       userRepository.findUser.mockResolvedValue(null);
 
       await expect(service.refreshToken(refreshTokenDto)).rejects.toThrow(
-        'Invalid email or password.',
+        'Invalid email. Please try again.',
       );
     });
 
@@ -390,7 +415,7 @@ describe('AuthService', () => {
       (argon.verify as jest.Mock).mockResolvedValue(false);
 
       await expect(service.refreshToken(refreshTokenDto)).rejects.toThrow(
-        'Invalid email or password.',
+        'Invalid password. Please try again.',
       );
     });
 
@@ -412,9 +437,10 @@ describe('AuthService', () => {
       jwtService.sign.mockReturnValue('reset-token');
       userRepository.save.mockResolvedValue(customerUser);
 
-      const result = await service.forgetPassword({
-        email: 'john.doe@example.com',
-      });
+      const result = await service.forgetPassword(
+        { email: 'john.doe@example.com' },
+        userIpAddress,
+      );
 
       expect(result).toEqual({
         message: 'Password reset link has been sent to your email.',
@@ -430,8 +456,12 @@ describe('AuthService', () => {
         }),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
-        MAIL_EVENTS.PASSWORD_RESET,
+        AUTH_EVENTS.PASSWORD_RESET,
         expect.any(ForgetPasswordEvent),
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTH_EVENTS.CUSTOMER_FORGET_PASSWORD,
+        expect.any(CustomerForgetPasswordEvent),
       );
     });
 
@@ -439,7 +469,10 @@ describe('AuthService', () => {
       userRepository.findUser.mockResolvedValue(null);
 
       await expect(
-        service.forgetPassword({ email: 'missing@example.com' }),
+        service.forgetPassword(
+          { email: 'missing@example.com' },
+          userIpAddress,
+        ),
       ).rejects.toThrow('Invalid email. Please try again.');
     });
   });
@@ -452,6 +485,7 @@ describe('AuthService', () => {
 
     const userWithResetToken: User = {
       ...customerUser,
+      resetPasswordToken: 'hashed-reset-token',
       resetPasswordTokenExpiryDate: new Date(Date.now() + 60_000),
     };
 
@@ -466,7 +500,10 @@ describe('AuthService', () => {
       userRepository.findUser.mockResolvedValue(userWithResetToken);
       userRepository.save.mockResolvedValue(userWithResetToken);
 
-      const result = await service.resetPassword(resetPasswordDto);
+      const result = await service.resetPassword(
+        resetPasswordDto,
+        userIpAddress,
+      );
 
       expect(result).toEqual({
         message: 'Your password has been successfully reset',
@@ -479,28 +516,33 @@ describe('AuthService', () => {
         }),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
-        MAIL_EVENTS.PASSWORD_RESET_SUCCESSFUL,
+        AUTH_EVENTS.PASSWORD_RESET_SUCCESSFUL,
         expect.any(PasswordResetSuccessful),
+      );
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTH_EVENTS.CUSTOMER_PASSWORD_RESET,
+        expect.any(CustomerPasswordResetEvent),
       );
     });
 
     it('should throw UnauthorizedException when user is not found', async () => {
       userRepository.findUser.mockResolvedValue(null);
 
-      await expect(service.resetPassword(resetPasswordDto)).rejects.toThrow(
-        'Invalid email. Please try again.',
-      );
+      await expect(
+        service.resetPassword(resetPasswordDto, userIpAddress),
+      ).rejects.toThrow('Invalid email. Please try again.');
     });
 
     it('should throw UnauthorizedException when reset token has expired', async () => {
       userRepository.findUser.mockResolvedValue({
         ...userWithResetToken,
+        resetPasswordToken: 'hashed-reset-token',
         resetPasswordTokenExpiryDate: new Date(Date.now() - 60_000),
       });
 
-      await expect(service.resetPassword(resetPasswordDto)).rejects.toThrow(
-        'The reset token has expired. Please try again.',
-      );
+      await expect(
+        service.resetPassword(resetPasswordDto, userIpAddress),
+      ).rejects.toThrow('The reset token has expired. Please try again.');
     });
   });
 });

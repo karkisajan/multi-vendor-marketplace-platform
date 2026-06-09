@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { MAIL_EVENTS } from 'src/mail/events/mail-event-names';
+import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
 import {
   ForgetPasswordEvent,
   UserRegistrationEvent,
   VendorRegistrationEvent,
-} from 'src/mail/events/mail.events';
+} from 'src/mail/events/auth.events';
 import { MailService } from 'src/mail/mail.service';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class AuthListener {
   constructor(private readonly mailService: MailService) {}
 
   /* Customer registration event */
-  @OnEvent(MAIL_EVENTS.CUSTOMER_REGISTERED)
+  @OnEvent(AUTH_EVENTS.CUSTOMER_REGISTERED)
   async handleCustomerRegistred(event: UserRegistrationEvent) {
     try {
       await this.mailService.sendCustomerRegistrationEmail(event);
@@ -27,7 +27,7 @@ export class AuthListener {
   }
 
   /* Vendor registration event */
-  @OnEvent(MAIL_EVENTS.VENDOR_REGISTERED)
+  @OnEvent(AUTH_EVENTS.VENDOR_REGISTERED)
   async handleVendorRegistered(event: VendorRegistrationEvent) {
     try {
       await this.mailService.sendVendorRegistrationEmail(event);
@@ -40,7 +40,7 @@ export class AuthListener {
   }
 
   /* Customer password reset event */
-  @OnEvent(MAIL_EVENTS.PASSWORD_RESET_SUCCESSFUL)
+  @OnEvent(AUTH_EVENTS.PASSWORD_RESET_SUCCESSFUL)
   async handleForgetPasswordEvent(event: ForgetPasswordEvent) {
     try {
       await this.mailService.sendForgetPasswordLinkEmail(event);

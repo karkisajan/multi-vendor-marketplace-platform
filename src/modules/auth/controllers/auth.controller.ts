@@ -14,6 +14,7 @@ import {
 import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
 import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
 import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
+import { IpAddress } from 'src/common/decorators/ip-address.decorator';
 
 @ApiTags('Auth')
 @Controller('/auth/users')
@@ -26,8 +27,14 @@ export class AuthController {
    */
   @ApiRegisterUser()
   @Post('/register')
-  async registerCustomer(@Body() registerUserDto: RegisterCustomerDto) {
-    return await this.authService.registerCustomer(registerUserDto);
+  async registerCustomer(
+    @Body() registerUserDto: RegisterCustomerDto,
+    @IpAddress() userIpAddress: string,
+  ) {
+    return await this.authService.registerCustomer(
+      registerUserDto,
+      userIpAddress,
+    );
   }
 
   /**
@@ -46,8 +53,11 @@ export class AuthController {
    */
   @ApiLoginUser()
   @Post('/login')
-  async loginUser(@Body() loginUserDto: LoginUserDto) {
-    return await this.authService.loginUser(loginUserDto);
+  async loginUser(
+    @Body() loginUserDto: LoginUserDto,
+    @IpAddress() userIpAddress: string,
+  ) {
+    return await this.authService.loginUser(loginUserDto, userIpAddress);
   }
 
   /**
@@ -66,8 +76,14 @@ export class AuthController {
    */
   @ApiForgetPassword()
   @Post('/forget-password')
-  async forgetPassword(@Body() forgetPasswordDto: ForgetPasswordDto) {
-    return await this.authService.forgetPassword(forgetPasswordDto);
+  async forgetPassword(
+    @Body() forgetPasswordDto: ForgetPasswordDto,
+    @IpAddress() userIpAddress: string,
+  ) {
+    return await this.authService.forgetPassword(
+      forgetPasswordDto,
+      userIpAddress,
+    );
   }
 
   /**
@@ -76,7 +92,13 @@ export class AuthController {
    */
   @ApiResetPassword()
   @Post('/reset-password')
-  async resetPassword(@Body() resetPasswordDto: ResetPasswordDto) {
-    return await this.authService.resetPassword(resetPasswordDto);
+  async resetPassword(
+    @Body() resetPasswordDto: ResetPasswordDto,
+    @IpAddress() userIpAddress: string,
+  ) {
+    return await this.authService.resetPassword(
+      resetPasswordDto,
+      userIpAddress,
+    );
   }
 }

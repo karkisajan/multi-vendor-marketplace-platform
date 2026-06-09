@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   UnauthorizedException,
@@ -15,12 +16,15 @@ import { RefreshTokenDto } from 'src/modules/users/dto/refresh-token.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { MAIL_EVENTS } from 'src/mail/events/mail-event-names';
+import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
 import {
+  CustomerForgetPasswordEvent,
+  CustomerPasswordResetEvent,
   ForgetPasswordEvent,
   PasswordResetSuccessful,
+  UserLoggedInEvent,
   UserRegistrationEvent,
-} from 'src/mail/events/mail.events';
+} from 'src/mail/events/auth.events';
 import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
 import { VendorProfileRepository } from 'src/modules/users/repositories/vendor-profile.repository';
 import { VendorProfile } from 'src/modules/users/entities/vendor-profile.entity';
@@ -56,7 +60,7 @@ export class AuthService {
     registrationDto: RegisterCustomerDto | RegisterVendorDto,
   ): void {
     if (registrationDto.password !== registrationDto.confirmPassword) {
-      throw new UnauthorizedException(
+      throw new BadRequestException(
         'Passwords does not match. Please try again.',
       );
     }
@@ -99,7 +103,7 @@ export class AuthService {
               }
             : {
                 id: user.vendorProfile.id,
-                firstName: user.vendorProfile.businessName,
+                businessName: user.vendorProfile.businessName,
                 profileUrl: user.vendorProfile.businessProfileUrl,
                 phoneNumber: user.vendorProfile.phoneNumber,
               },
@@ -112,18 +116,18 @@ export class AuthService {
    * Registers a new customer account and creates a customer profile within a single database transaction.
    * Emits a CUSTOMER_REGISTERED event after successful persistence.
    */
-  async registerCustomer(registerCustomerDto: RegisterCustomerDto) {
+  async registerCustomer(
+    registerCustomerDto: RegisterCustomerDto,
+    userIpAddress: string,
+  ) {
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
-        /* Check whether the confirm password and passwords should match */
         this.checkPasswordMatches(registerCustomerDto);
 
-        /* Check whether the user with same email already exists */
         await this.checkEmailAlreadyExist(
           normalizedEmail(registerCustomerDto.email),
         );
 
-        /* Hash password using ARGON*/
         const hashedPassword: string = await argon.hash(
           registerCustomerDto.password,
         );
@@ -159,10 +163,12 @@ export class AuthService {
 
     /* Send Registration Email once user account created */
     this.eventEmitter.emit(
-      MAIL_EVENTS.CUSTOMER_REGISTERED,
+      AUTH_EVENTS.CUSTOMER_REGISTERED,
       new UserRegistrationEvent(
+        result.id,
         result.email,
         `${result.customerProfile.firstName} ${result.customerProfile.lastName}`,
+        userIpAddress,
       ),
     );
 
@@ -177,15 +183,12 @@ export class AuthService {
   async registerVendor(registerVendorDto: RegisterVendorDto) {
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
-        /* Check whether the confirm password and passwords should match */
         this.checkPasswordMatches(registerVendorDto);
 
-        /* Check whether the user with same email already exists */
         await this.checkEmailAlreadyExist(
           normalizedEmail(registerVendorDto.email),
         );
 
-        /* Hash password using ARGON*/
         const hashedPassword: string = await argon.hash(
           registerVendorDto.password,
         );
@@ -205,7 +208,8 @@ export class AuthService {
           );
 
         return {
-          message: 'Vendor registered successfully.',
+          message:
+            'Vendor business account registered successfully. Please wait for your approval.',
           id: savedVendor.id,
           email: savedVendor.email,
           role: savedVendor.role,
@@ -220,13 +224,13 @@ export class AuthService {
     );
 
     /* Send Registration Email once user account created */
-    this.eventEmitter.emit(
-      MAIL_EVENTS.VENDOR_REGISTERED,
-      new UserRegistrationEvent(
-        result.email,
-        `${result.vendorProfile.businessName} ${result.vendorProfile.businessProfileUrl}`,
-      ),
-    );
+    // this.eventEmitter.emit(
+    //   AUTH_EVENTS.VENDOR_REGISTERED,
+    //   new UserRegistrationEvent(
+    //     result.email,
+    //     `${result.vendorProfile.businessName} ${result.vendorProfile.businessProfileUrl}`,
+    //   ),
+    // );
 
     return result;
   }
@@ -235,7 +239,7 @@ export class AuthService {
    * ------ POST - login user
    * Authenticates an existing customer or vendor by email and password; returns JWT tokens and profile on success.
    */
-  async loginUser(loginUserDto: LoginUserDto) {
+  async loginUser(loginUserDto: LoginUserDto, userIpAddress: string) {
     const user: User | null = await this.userRepository.findUser(
       normalizedEmail(loginUserDto.email),
     );
@@ -244,13 +248,24 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
-    /* Verify the password */
     const isPasswordMatching: boolean = await argon.verify(
       user.password,
       loginUserDto.password,
     );
     if (!isPasswordMatching) {
       throw new UnauthorizedException('Invalid email or password.');
+    }
+
+    if (user.role === UserRoleEnum.CUSTOMER) {
+      this.eventEmitter.emit(
+        AUTH_EVENTS.CUSTOMER_LOGGED_IN,
+        new UserLoggedInEvent(
+          user.id,
+          user.email,
+          `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+          userIpAddress,
+        ),
+      );
     }
 
     return await this.jwtTokenResponse(user, user.role);
@@ -264,7 +279,7 @@ export class AuthService {
   async refreshToken(refreshTokenDto: RefreshTokenDto) {
     const { refreshToken } = refreshTokenDto;
 
-    /* Verify the jwtTokenKey */
+    /* Verify the refresh token payload with JwtRefreshTokenKey */
     const payload: JwtPayload = this.jwtService.verify<JwtPayload>(
       refreshToken,
       {
@@ -275,7 +290,7 @@ export class AuthService {
     /* GET user and verify the user-password */
     const user: User | null = await this.userRepository.findUser(payload.email);
     if (!user) {
-      throw new UnauthorizedException('Invalid email or password.');
+      throw new UnauthorizedException('Invalid email. Please try again.');
     }
 
     const isPasswordVerified: boolean = await argon.verify(
@@ -283,12 +298,15 @@ export class AuthService {
       refreshToken,
     );
     if (!isPasswordVerified) {
-      throw new UnauthorizedException('Invalid email or password.');
+      throw new UnauthorizedException('Invalid password. Please try again.');
     }
 
-    /* Verify weather the JwtTokenKey is past the current date */
-    const currentDate: Date = new Date(Date.now());
-    if (currentDate > user.refreshTokenExpiryDate) {
+    /* Verify the JwtTokenRefreshKey is past the date of current date */
+    if (
+      user &&
+      (!user.refreshTokenExpiryDate ||
+        user.refreshTokenExpiryDate < new Date(Date.now()))
+    ) {
       throw new UnauthorizedException('Refresh token has expired.');
     }
 
@@ -299,7 +317,10 @@ export class AuthService {
    * ------ POST - forget password
    * Generates a short-lived password reset token for the user, persists its hash, and emits PASSWORD_RESET with the reset link.
    */
-  async forgetPassword(forgetPasswordDto: ForgetPasswordDto) {
+  async forgetPassword(
+    forgetPasswordDto: ForgetPasswordDto,
+    userIpAddress: string,
+  ) {
     const user: User | null = await this.userRepository.findUser(
       normalizedEmail(forgetPasswordDto.email),
     );
@@ -307,10 +328,6 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email. Please try again.');
     }
 
-    /**
-     * Verify the JwtToken is valid.
-     * Hash the verified token key and store it in database.
-     */
     const payload: JwtPayload = {
       id: user.id,
       email: user.email,
@@ -329,13 +346,25 @@ export class AuthService {
     await this.userRepository.save(user);
 
     this.eventEmitter.emit(
-      MAIL_EVENTS.PASSWORD_RESET,
+      AUTH_EVENTS.PASSWORD_RESET,
       new ForgetPasswordEvent(
         user.email,
         `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
         resetToken,
       ),
     );
+
+    if (user.role === UserRoleEnum.CUSTOMER) {
+      this.eventEmitter.emit(
+        AUTH_EVENTS.CUSTOMER_FORGET_PASSWORD,
+        new CustomerForgetPasswordEvent(
+          user.id,
+          user.email,
+          `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+          userIpAddress,
+        ),
+      );
+    }
 
     return {
       message: 'Password reset link has been sent to your email.',
@@ -346,7 +375,10 @@ export class AuthService {
    * ------ POST - reset password
    * Validates the reset token and expiry, updates the user password, clears reset token fields, and emits PASSWORD_RESET_SUCCESSFUL.
    */
-  async resetPassword(resetPasswordDto: ResetPasswordDto) {
+  async resetPassword(
+    resetPasswordDto: ResetPasswordDto,
+    userIpAddress: string,
+  ) {
     const payload: JwtPayload = this.jwtService.verify(
       resetPasswordDto.resetToken,
       {
@@ -359,6 +391,19 @@ export class AuthService {
     );
     if (!user) {
       throw new UnauthorizedException('Invalid email. Please try again.');
+    }
+
+    if (!user.resetPasswordToken) {
+      throw new UnauthorizedException(
+        'No password reset token was requested. Please try again.',
+      );
+    }
+    const isVerifiedPassword: boolean = await argon.verify(
+      user.resetPasswordToken,
+      resetPasswordDto.resetToken,
+    );
+    if (!isVerifiedPassword) {
+      throw new UnauthorizedException('Invalid password. Please try again.');
     }
 
     if (
@@ -380,12 +425,24 @@ export class AuthService {
     await this.userRepository.save(user);
 
     this.eventEmitter.emit(
-      MAIL_EVENTS.PASSWORD_RESET_SUCCESSFUL,
+      AUTH_EVENTS.PASSWORD_RESET_SUCCESSFUL,
       new PasswordResetSuccessful(
         user.email,
         `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
       ),
     );
+
+    if (user.role === UserRoleEnum.CUSTOMER) {
+      this.eventEmitter.emit(
+        AUTH_EVENTS.CUSTOMER_PASSWORD_RESET,
+        new CustomerPasswordResetEvent(
+          user.id,
+          user.email,
+          `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+          userIpAddress,
+        ),
+      );
+    }
 
     return {
       message: 'Your password has been successfully reset',

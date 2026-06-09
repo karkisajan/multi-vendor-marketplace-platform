@@ -3,6 +3,7 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -12,6 +13,7 @@ import { AuthProviderTypeEnum } from 'src/common/enums/auth-providerType.enum';
 import { UserStatusEnum } from 'src/common/enums/user-status.enum';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 import { VendorProfile } from './vendor-profile.entity';
+import { AuditLog } from 'src/modules/audit-logs/entities/audit-logs.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -73,4 +75,8 @@ export class User {
     cascade: true,
   })
   vendorProfile: VendorProfile;
+
+  /* One to many relation (user to audit logs) can have multiple audit logs */
+  @OneToMany(() => AuditLog, (auditLog) => auditLog.user)
+  auditLogs: AuditLog[];
 }

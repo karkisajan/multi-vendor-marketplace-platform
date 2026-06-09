@@ -7,8 +7,10 @@ export class MailService {
 
   /* Send welcome registration email for customer */
   async sendCustomerRegistrationEmail(user: {
+    userId: string;
     email: string;
     username: string;
+    ipAddress: string;
   }) {
     await this.mailerService.sendMail({
       to: user.email,

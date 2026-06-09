@@ -12,12 +12,14 @@ import { MailService } from 'src/mail/mail.service';
 import { CustomerProfile } from '../users/entities/customer-profile.entity';
 import { VendorProfile } from '../users/entities/vendor-profile.entity';
 import { VendorProfileRepository } from '../users/repositories/vendor-profile.repository';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, CustomerProfile, VendorProfile]),
     JwtModule.register({ signOptions: { expiresIn: '7d' } }),
     MailModule,
+    AuditLogsModule,
   ],
   controllers: [AuthController],
   providers: [
