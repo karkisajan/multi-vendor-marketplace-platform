@@ -14,7 +14,7 @@ import {
 import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
 import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
 import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
-import { IpAddress } from 'src/common/decorators/ip-address.decorator';
+import { IpAddress } from 'src/core/decorators/ip-address.decorator';
 
 @ApiTags('Auth')
 @Controller('/auth/users')
