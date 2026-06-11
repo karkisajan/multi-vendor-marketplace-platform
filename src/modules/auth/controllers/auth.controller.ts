@@ -43,8 +43,14 @@ export class AuthController {
    */
   @ApiRegisterUser()
   @Post('/vendor/register')
-  async registerVendor(@Body() registerUserDto: RegisterVendorDto) {
-    return await this.authService.registerVendor(registerUserDto);
+  async registerVendor(
+    @Body() registerUserDto: RegisterVendorDto,
+    @IpAddress() userIpAddress: string,
+  ) {
+    return await this.authService.registerVendor(
+      registerUserDto,
+      userIpAddress,
+    );
   }
 
   /**

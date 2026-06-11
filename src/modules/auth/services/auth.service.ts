@@ -178,7 +178,10 @@ export class AuthService {
    * Registers a new vendor account and creates a vendor profile within a single database transaction.
    * Emits a VENDOR_REGISTERED event after successful persistence.
    */
-  async registerVendor(registerVendorDto: RegisterVendorDto) {
+  async registerVendor(
+    registerVendorDto: RegisterVendorDto,
+    userIpAddress: string,
+  ) {
     const result = await this.dataSource.transaction(
       async (manager: EntityManager) => {
         this.checkPasswordMatches(registerVendorDto);
@@ -222,13 +225,15 @@ export class AuthService {
     );
 
     /* Send Registration Email once user account created */
-    // this.eventEmitter.emit(
-    //   AUTH_EVENTS.VENDOR_REGISTERED,
-    //   new UserRegistrationEvent(
-    //     result.email,
-    //     `${result.vendorProfile.businessName} ${result.vendorProfile.businessProfileUrl}`,
-    //   ),
-    // );
+    this.eventEmitter.emit(
+      AUTH_EVENTS.VENDOR_REGISTERED,
+      new UserRegistrationEvent(
+        result.id,
+        result.email,
+        `${result.vendorProfile.businessName} ${result.vendorProfile.businessProfileUrl}`,
+        userIpAddress,
+      ),
+    );
 
     return result;
   }
