@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:user": "ts-node -r tsconfig-paths/register ./src/database/seed/user.seed.ts",
-    "seed:all": "npm run seed:user",
+    "seed:category": "ts-node -r tsconfig-paths/register ./src/database/seed/category.seed.ts",
+    "seed:all": "npm run seed:user && npm run seed:category",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:generate": "npm run typeorm -- -d src/database/data-source.ts migration:generate",
     "migration:create": "npm run typeorm -- migration:create src/database/migrations/",
@@ -56,6 +57,7 @@
     "pg": "^8.16.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "slugify": "^1.6.9",
     "typeorm": "^0.3.28",
     "typeorm-naming-strategies": "^4.1.0"
   },

@@ -10,27 +10,28 @@ import {
 import { UserStatusEnum } from 'src/common/enums/user-status.enum';
 import { ApiProperty } from '@nestjs/swagger';
 
+/**
+ * Payload for registering a new vendor account.
+ */
 export class RegisterVendorDto {
-  /* Username */
-  @ApiProperty({ example: 'John', description: 'First name of the user' })
-  @MinLength(3, { message: 'First name should be of atleast 3 characters.' })
-  @IsNotEmpty({ message: 'First name is required.' })
-  @IsString({ message: 'First name must be a string.' })
+  /* Legal or registered name of the business entity */
+  @ApiProperty({ example: 'Acme Corp', description: 'Registered business name of the vendor' })
+  @MinLength(3, { message: 'Business name should be of atleast 3 characters.' })
+  @IsNotEmpty({ message: 'Business name is required.' })
+  @IsString({ message: 'Business name must be a string.' })
   businessName: string;
 
-  /* Email */
+  /* Email address used for vendor dashboard access and official notices */
   @ApiProperty({
-    example: 'john.doe@example.com',
-    description: 'Email of the user',
+    example: 'vendor@example.com',
+    description: 'Email of the vendor',
   })
-  @IsNotEmpty({ message: 'Email is required.' })
   @IsEmail({}, { message: 'Invalid email format.' })
+  @IsNotEmpty({ message: 'Email is required.' })
   email: string;
 
-  /* Password */
+  /* Account password — enforces uppercase, lowercase, digit, and special char */
   @ApiProperty({ example: 'Password@123', description: 'Password of the user' })
-  @IsNotEmpty({ message: 'Password is required.' })
-  @MinLength(6, { message: 'Password must be at least 6 characters long.' })
   @Matches(
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
     {
@@ -38,28 +39,31 @@ export class RegisterVendorDto {
         'Password is too weak. It must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
     },
   )
+  @MinLength(6, { message: 'Password must be at least 6 characters long.' })
+  @IsNotEmpty({ message: 'Password is required.' })
   password: string;
 
-  /* Confirm password */
+  /* Password confirmation to prevent entry errors */
   @ApiProperty({
     example: 'Password@123',
     description: 'Confirm password must match password',
   })
   @IsNotEmpty({ message: 'Confirm password is required.' })
+  @IsString({ message: 'Confirm password must be a string.' })
   confirmPassword: string;
 
-  /* User status weather active or inactive */
+  /* Current activation state of the vendor account */
   @ApiProperty({ enum: UserStatusEnum, required: false })
   @IsOptional()
   @IsEnum(UserStatusEnum, { message: 'Invalid user status.' })
   status: string;
 
-  /* Phone number */
+  /* Contact phone number in E.164 format */
   @ApiProperty({ example: '+9779812345678', required: false })
   @IsOptional()
-  @IsString({ message: 'Invalid phone number format.' })
   @Matches(/^\+?[1-9]\d{1,14}$/, {
     message: 'Invalid phone number format.',
   })
+  @IsString({ message: 'Invalid phone number format.' })
   phoneNumber?: string;
 }
