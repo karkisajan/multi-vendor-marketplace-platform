@@ -26,6 +26,8 @@ import Keyv from 'keyv';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+
+    // Redis cache-manager setup
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
@@ -40,6 +42,8 @@ import Keyv from 'keyv';
         ttl: 60 * 1000,
       }),
     }),
+
+    // Event-Emitter for event-based logging
     EventEmitterModule.forRoot(),
     JwtModule.register({}),
     TypeOrmModule.forRootAsync({
