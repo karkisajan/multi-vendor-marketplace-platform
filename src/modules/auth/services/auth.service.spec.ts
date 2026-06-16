@@ -238,7 +238,10 @@ describe('AuthService', () => {
         phoneNumber: '+9779812345678',
       });
 
-      const result = await service.registerVendor(registerVendorDto);
+      const result = await service.registerVendor(
+        registerVendorDto,
+        userIpAddress,
+      );
 
       expect(result).toEqual({
         message:
@@ -259,13 +262,18 @@ describe('AuthService', () => {
         expect.any(Object),
         UserRoleEnum.VENDOR,
       );
-      expect(eventEmitter.emit).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTH_EVENTS.VENDOR_REGISTERED,
+        expect.any(UserRegistrationEvent),
+      );
     });
 
     it('should throw BadRequestException when passwords do not match', async () => {
       const dto = { ...registerVendorDto, confirmPassword: 'Mismatch@123' };
 
-      await expect(service.registerVendor(dto)).rejects.toThrow(
+      await expect(
+        service.registerVendor(dto, userIpAddress),
+      ).rejects.toThrow(
         new BadRequestException('Passwords does not match. Please try again.'),
       );
       expect(userRepository.registerUser).not.toHaveBeenCalled();
@@ -274,7 +282,9 @@ describe('AuthService', () => {
     it('should throw ConflictException when email already exists', async () => {
       userRepository.findUser.mockResolvedValue(vendorUser);
 
-      await expect(service.registerVendor(registerVendorDto)).rejects.toThrow(
+      await expect(
+        service.registerVendor(registerVendorDto, userIpAddress),
+      ).rejects.toThrow(
         ConflictException,
       );
     });

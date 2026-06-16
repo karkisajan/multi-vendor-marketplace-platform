@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { Category } from '../entities/category.entity';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
+import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
 
 @Injectable()
 export class CategoryRepository extends Repository<Category> {
@@ -31,10 +32,37 @@ export class CategoryRepository extends Repository<Category> {
     return this.findOne({ where: { id } });
   }
 
+  async findAndCountParentCategories({
+    page,
+    limit,
+  }: {
+    page: number;
+    limit: number;
+  }): Promise<{ categories: Category[]; totalCategories: number }> {
+    const [categories, totalCategories]: [Category[], number] =
+      await Promise.all([
+        this.find({
+          where: {
+            parentId: IsNull(),
+            status: StatusTypeEnum.PUBLISHED,
+            isActive: true,
+          },
+          skip: (page - 1) * limit,
+          take: limit,
+          order: { createdAt: 'desc' },
+          select: ['id', 'name', 'slug', 'imageUrl'],
+        }),
+
+        this.count(),
+      ]);
+
+    return { categories, totalCategories };
+  }
+
   /**
    * GET flat list of categories
    */
-  async findAllCategories({
+  async findAndCountCategories({
     page,
     limit,
     whereCondition,

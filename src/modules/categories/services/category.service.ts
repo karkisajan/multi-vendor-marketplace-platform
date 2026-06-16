@@ -8,16 +8,21 @@ import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
 import { Category } from '../entities/category.entity';
 import { generateSlug } from 'src/common/utils/generate-slug.util';
-import { validatePagination } from 'src/common/utils/validate-pagination.util';
-import { validatePaginationLimit } from 'src/common/utils/validate-paginationLimit.util';
+import { validatePaginationFields } from 'src/common/utils/validate-pagination.util';
 import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
-import { FindOptionsWhere, ILike } from 'typeorm';
+import { FindOptionsWhere, ILike, IsNull } from 'typeorm';
 
 @Injectable()
 export class CategoryService {
   constructor(private readonly categoryRepository: CategoryRepository) {}
 
-  /* Filter categories by ( status, isActive and query ) */
+  /**
+   * Helper method to map filtering criteria (status, isActive, search query)
+   * to a TypeORM FindOptionsWhere conditions object.
+   * @param status - Filter by publication status
+   * @param isActive - Filter by category visibility
+   * @param query - Case-insensitive partial match query for category name
+   */
   private filterCategories(
     status?: StatusTypeEnum,
     isActive?: boolean,
@@ -40,7 +45,63 @@ export class CategoryService {
     return whereCondition;
   }
 
-  /* GET - flat categories */
+  /**
+   * ------ GET - parent-categories
+   * Retrieves a paginated list of all top-level parent categories (where parentId is null).
+   * Validates pagination inputs and returns data along with standard pagination metadata.
+   * @param page - Page number (1-indexed)
+   * @param limit - Number of items to retrieve per page
+   * @returns Object containing categories list and pagination metadata
+   */
+  async getAllParentCategories({
+    page,
+    limit,
+  }: {
+    page: number;
+    limit: number;
+  }) {
+    const newLimit: number = validatePaginationFields(page, limit);
+    const {
+      categories,
+      totalCategories,
+    }: { categories: Category[]; totalCategories: number } =
+      await this.categoryRepository.findAndCountParentCategories({
+        page: page,
+        limit: newLimit,
+      });
+
+    if (totalCategories === 0) {
+      return {
+        data: [],
+        meta: {
+          page: page,
+          limit: newLimit,
+          total: 0,
+          totalPages: 0,
+        },
+      };
+    }
+
+    const totalPages: number =
+      totalCategories === 0 ? 0 : Math.ceil(totalCategories / newLimit);
+    return {
+      data: categories,
+      meta: {
+        page: page,
+        limit: newLimit,
+        total: totalCategories,
+        totalPages: totalPages,
+      },
+    };
+  }
+
+  /**
+   * ------ GET - flat categories
+   * Retrieves a paginated list of all categories in a flat format, with optional filtering criteria applied.
+   * Validates pagination parameters and builds TypeORM query options to count matching records.
+   * @param params - Object containing pagination options and filters (status, isActive, search query)
+   * @returns Object containing categories list and pagination metadata
+   */
   async getFlatCategories({
     page,
     limit,
@@ -54,8 +115,7 @@ export class CategoryService {
     isActive?: boolean;
     query?: string;
   }) {
-    validatePagination(page, limit);
-    const newLimit: number = validatePaginationLimit(limit);
+    const newLimit: number = validatePaginationFields(page, limit);
 
     const whereCondition: FindOptionsWhere<Category> = this.filterCategories(
       status,
@@ -64,7 +124,7 @@ export class CategoryService {
     );
 
     const { categories, totalCategories } =
-      await this.categoryRepository.findAllCategories({
+      await this.categoryRepository.findAndCountCategories({
         page,
         limit,
         whereCondition,
@@ -96,8 +156,69 @@ export class CategoryService {
   }
 
   /**
-   * Creates a new product category after ensuring the name is unique.
-   * Generates a slug automatically from the category name.
+   * ------ GET - category-tree
+   * Builds and returns a 3-level deep hierarchical category tree.
+   * Queries parent categories first, then fetches their child and grandchild relationships iteratively.
+   * @returns Hierarchical nested category tree list with child subcategories
+   */
+  async getCategoryTree(): Promise<
+    Array<Category & { children: Array<Category & { children: Category[] }> }>
+  > {
+    /* GET first level parent-categories */
+    const firstLevelCategories: Category[] = await this.categoryRepository.find(
+      {
+        where: {
+          parentId: IsNull(),
+        },
+        select: ['id', 'name', 'slug', 'imageUrl'],
+      },
+    );
+
+    const result: Array<
+      Category & { children: Array<Category & { children: Category[] }> }
+    > = [];
+    for (const firstLevelCategory of firstLevelCategories) {
+      const secondLevelCategories = await this.categoryRepository.find({
+        where: {
+          parentId: firstLevelCategory.id,
+        },
+        select: ['id', 'name', 'slug', 'imageUrl'],
+      });
+
+      const secondLevelCategoriesResult: Array<
+        Category & { children: Category[] }
+      > = [];
+      for (const secondLevelCategory of secondLevelCategories) {
+        const thirdLevelCategories = await this.categoryRepository.find({
+          where: {
+            parentId: secondLevelCategory.id,
+          },
+          select: ['id', 'name', 'slug', 'imageUrl'],
+        });
+
+        secondLevelCategoriesResult.push({
+          ...secondLevelCategory,
+          children: thirdLevelCategories,
+        });
+      }
+
+      result.push({
+        ...firstLevelCategory,
+        children: secondLevelCategoriesResult,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * ------ POST - Create category
+   * Creates a new category. Ensures name uniqueness and checks parent category existence if parentId is provided.
+   * Generates a unique slug from the category name and persists it in the database.
+   * @param createCategoryDto - Category definition payload
+   * @returns Saved category details including generated ID and slug
+   * @throws NotFoundException if the referenced parent category does not exist
+   * @throws ConflictException if a category with the same name or generated slug already exists
    */
   async createCategory(createCategoryDto: CreateCategoryDto) {
     if (createCategoryDto.parentId) {
@@ -141,8 +262,15 @@ export class CategoryService {
   }
 
   /**
-   * Updates an existing category by ID.
-   * If the name changes, validates uniqueness and regenerates the slug.
+   * ------ PUT - Update category
+   * Updates fields of an existing category by its ID.
+   * If name changes, it checks for name uniqueness and regenerates the slug.
+   * If parentId changes, it prevents circular references (assigning self as parent) and ensures the parent exists.
+   * @param id - Category ID to update
+   * @param updateCategoryDto - Fields to update
+   * @returns The updated category record
+   * @throws NotFoundException if the category or the new parent category is not found
+   * @throws ConflictException if name/slug conflicts occur or if the category is assigned as its own parent
    */
   async updateCategory(
     id: string,
@@ -195,6 +323,7 @@ export class CategoryService {
     if (!updated) {
       throw new NotFoundException('Category not found after update.');
     }
+
     return updated;
   }
 }

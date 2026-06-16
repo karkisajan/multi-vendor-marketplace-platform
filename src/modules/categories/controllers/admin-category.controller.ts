@@ -5,6 +5,8 @@ import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
 import {
   ApiCreateCategory,
+  ApiGetCategoryTree,
+  ApiGetFlatCategories,
   ApiUpdateCategory,
 } from '../decorators/category-swagger.decorator';
 import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
@@ -14,6 +16,11 @@ import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
 export class AdminCategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
+  /**
+   * ------ GET - Get flat categories
+   * Fetches a paginated, flat list of all categories with optional filters for status, active status, and search query.
+   */
+  @ApiGetFlatCategories()
   @Get('/flat-categories')
   async getFlatCategories(
     @Query('page') page: number,
@@ -32,6 +39,16 @@ export class AdminCategoryController {
   }
 
   /**
+   * ------ GET - Get category tree
+   * Retrieves the full nested tree structure of categories, mapping up to 3 levels deep.
+   */
+  @ApiGetCategoryTree()
+  @Get('/category-tree')
+  async getCategoryTree() {
+    return this.categoryService.getCategoryTree();
+  }
+
+  /**
    * ------ POST - Create category
    * Creates a new category with a unique name and automatically generated slug.
    */
@@ -42,7 +59,7 @@ export class AdminCategoryController {
   }
 
   /**
-   * ------ PATCH - Update category by ID
+   * ------ PUT - Update category by ID
    * Updates fields of an existing category and regenerates slug if the name changes.
    */
   @ApiUpdateCategory()
