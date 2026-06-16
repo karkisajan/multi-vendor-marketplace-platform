@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { join } from 'path';
@@ -15,10 +16,29 @@ import { JwtModule } from '@nestjs/jwt';
 import { AuthenticationMiddleware } from './middlewares/authentication.middleware';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
+import { CacheModule } from '@nestjs/cache-manager';
+import { RedisModule } from './redis/redis.module';
+import KeyvRedis from '@keyv/redis';
+import Keyv from 'keyv';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    CacheModule.registerAsync({
+      isGlobal: true,
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        stores: [
+          new Keyv({
+            store: new KeyvRedis(
+              `redis://${configService.get('REDIS_HOST')}:${configService.get('REDIS_PORT')}`,
+            ),
+          }),
+        ],
+        ttl: 60 * 1000,
+      }),
     }),
     EventEmitterModule.forRoot(),
     JwtModule.register({}),
@@ -46,6 +66,7 @@ import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
     CartModule,
     OrdersModule,
     AuditLogsModule,
+    RedisModule,
   ],
   providers: [
     {
