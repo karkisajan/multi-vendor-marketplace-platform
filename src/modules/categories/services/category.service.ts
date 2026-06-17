@@ -13,6 +13,7 @@ import { validatePaginationFields } from 'src/common/utils/validate-pagination.u
 import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
 import { FindOptionsWhere, ILike, IsNull } from 'typeorm';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class CategoryService {
@@ -20,6 +21,25 @@ export class CategoryService {
     private readonly categoryRepository: CategoryRepository,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
+
+  /**
+   * Reads the current category cache namespace version; defaults to version 1
+   * so read endpoints can build stable keys before any mutation has occurred.
+   */
+  private async getCachedCategoryVersion(): Promise<string> {
+    const version = await this.cacheManager.get<string | number>(
+      'categories:version',
+    );
+    return String(version ?? 1);
+  }
+
+  /**
+   * Advances the category cache namespace after create, update, or delete.
+   * Existing list/tree entries stay in Redis until TTL expiry, while new reads use a unique token.
+   */
+  private async invalidateCategoryCache(): Promise<void> {
+    await this.cacheManager.set('categories:version', randomUUID());
+  }
 
   /**
    * Helper method to map filtering criteria (status, isActive, search query)
@@ -67,9 +87,12 @@ export class CategoryService {
   }) {
     const newLimit: number = validatePaginationFields(page, limit);
 
-    const cacheKey = `categories:parent:page=${page}:limit=${newLimit}`;
+    const version: string = await this.getCachedCategoryVersion();
+    const cacheKey: string = `categories:v${version}:parent:page=${page}:limit=${newLimit}`;
     const cachedData = await this.cacheManager.get(cacheKey);
-    if (cachedData) return cachedData;
+    if (cachedData) {
+      return cachedData;
+    }
 
     const {
       categories,
@@ -96,14 +119,14 @@ export class CategoryService {
             },
           };
 
-    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+    await this.cacheManager.set(cacheKey, result, 10 * 1000);
     return result;
   }
 
   /**
    * ------ GET - flat categories
    * Retrieves a paginated list of all categories in a flat format, with optional filtering criteria applied.
-   * Validates pagination parameters, builds TypeORM filter options, and caches the paginated response.
+   * Validates pagination parameters, builds TypeORM filter options, and caches each filter set separately.
    * @param params - Object containing pagination options and filters (status, isActive, search query)
    * @returns Object containing categories list and pagination metadata
    */
@@ -122,7 +145,9 @@ export class CategoryService {
   }) {
     const newLimit: number = validatePaginationFields(page, limit);
 
-    const cacheKey = `categories:flat:page=${page}:limit=${newLimit}`;
+    const version: string = await this.getCachedCategoryVersion();
+    const normalizedQuery = query?.trim().toLowerCase() ?? '';
+    const cacheKey: string = `categories:v${version}:flat:page=${page}:limit=${newLimit}:status=${status ?? 'all'}:isActive=${typeof isActive === 'boolean' ? isActive : 'all'}:query=${normalizedQuery}`;
     const cachedData = await this.cacheManager.get(cacheKey);
     if (cachedData) return cachedData;
 
@@ -135,7 +160,7 @@ export class CategoryService {
     const { categories, totalCategories } =
       await this.categoryRepository.findAndCountCategories({
         page,
-        limit,
+        limit: newLimit,
         whereCondition,
       });
 
@@ -146,7 +171,7 @@ export class CategoryService {
             meta: { page: page, limit: newLimit, total: 0, totalPages: 0 },
           }
         : {
-            data: [],
+            data: categories,
             meta: {
               page: page,
               limit: newLimit,
@@ -155,7 +180,7 @@ export class CategoryService {
             },
           };
 
-    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+    await this.cacheManager.set(cacheKey, result, 10 * 1000);
     return result;
   }
 
@@ -168,7 +193,8 @@ export class CategoryService {
   async getCategoryTree(): Promise<
     Array<Category & { children: Array<Category & { children: Category[] }> }>
   > {
-    const cacheKey = `categories:tree`;
+    const version: string = await this.getCachedCategoryVersion();
+    const cacheKey: string = `categories:v${version}:tree`;
     const cachedData =
       await this.cacheManager.get<
         Array<
@@ -223,14 +249,14 @@ export class CategoryService {
       });
     }
 
-    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+    await this.cacheManager.set(cacheKey, result, 10 * 1000);
     return result;
   }
 
   /**
    * ------ POST - Create category
    * Creates a new category. Ensures name uniqueness and checks parent category existence if parentId is provided.
-   * Generates a unique slug from the category name and persists it in the database.
+   * Generates a unique slug, persists it in the database, and advances the category cache version.
    * @param createCategoryDto - Category definition payload
    * @returns Saved category details including generated ID and slug
    * @throws NotFoundException if the referenced parent category does not exist
@@ -265,6 +291,8 @@ export class CategoryService {
     const savedCategory: Category =
       await this.categoryRepository.createCategory(createCategoryDto, slug);
 
+    await this.invalidateCategoryCache();
+
     return {
       message: 'Category created successfully.',
       id: savedCategory.id,
@@ -281,7 +309,7 @@ export class CategoryService {
    * ------ PUT - Update category
    * Updates fields of an existing category by its ID.
    * If name changes, it checks for name uniqueness and regenerates the slug.
-   * If parentId changes, it prevents circular references (assigning self as parent) and ensures the parent exists.
+   * If parentId changes, it prevents self-parenting, ensures the parent exists, and advances cached category reads.
    * @param id - Category ID to update
    * @param updateCategoryDto - Fields to update
    * @returns The updated category record
@@ -340,13 +368,14 @@ export class CategoryService {
       throw new NotFoundException('Category not found after update.');
     }
 
+    await this.invalidateCategoryCache();
     return updated;
   }
 
   /**
    * ------ DELETE - Delete category
    * Removes an existing category after confirming it has no child categories.
-   * Returns a success payload with the deleted category ID.
+   * Advances the category cache version so list and tree endpoints stop using stale keys.
    * @throws NotFoundException if the category does not exist
    * @throws ConflictException if any sub-categories still reference this category as parent
    */
@@ -384,6 +413,7 @@ export class CategoryService {
     }
 
     await this.categoryRepository.delete(categoryId);
+    await this.invalidateCategoryCache();
     return {
       id: `${categoryId}`,
       message: 'Category deleted successfully.',

@@ -17,6 +17,8 @@ describe('CategoryService', () => {
     updateCategory: jest.fn(),
     delete: jest.fn(),
     find: jest.fn(),
+    findAndCountParentCategories: jest.fn(),
+    findAndCountCategories: jest.fn(),
   };
 
   const cacheManager = {
@@ -49,6 +51,79 @@ describe('CategoryService', () => {
 
     service = module.get<CategoryService>(CategoryService);
     jest.clearAllMocks();
+  });
+
+  describe('cache versioning', () => {
+    it('should return cached flat categories without querying the repository', async () => {
+      const cachedResponse = {
+        data: [baseCategory],
+        meta: { page: 1, limit: 10, total: 1, totalPages: 1 },
+      };
+      cacheManager.get.mockImplementation((key: string) => {
+        if (key === 'categories:version') return Promise.resolve(7);
+        if (
+          key ===
+          'categories:v7:flat:page=1:limit=10:status=all:isActive=all:query='
+        ) {
+          return Promise.resolve(cachedResponse);
+        }
+        return Promise.resolve(undefined);
+      });
+
+      const result = await service.getFlatCategories({ page: 1, limit: 10 });
+
+      expect(result).toEqual(cachedResponse);
+      expect(categoryRepository.findAndCountCategories).not.toHaveBeenCalled();
+      expect(cacheManager.set).not.toHaveBeenCalled();
+    });
+
+    it('should include flat category filters in cache keys', async () => {
+      categoryRepository.findAndCountCategories.mockResolvedValue({
+        categories: [baseCategory],
+        totalCategories: 1,
+      });
+      cacheManager.get.mockImplementation((key: string) => {
+        if (key === 'categories:version') return Promise.resolve(3);
+        return Promise.resolve(undefined);
+      });
+
+      await service.getFlatCategories({
+        page: 1,
+        limit: 10,
+        status: StatusTypeEnum.PUBLISHED,
+        isActive: true,
+        query: '  Electronics  ',
+      });
+
+      expect(categoryRepository.findAndCountCategories).toHaveBeenCalledWith(
+        expect.objectContaining({
+          page: 1,
+          limit: 10,
+        }),
+      );
+      expect(cacheManager.set).toHaveBeenCalledWith(
+        'categories:v3:flat:page=1:limit=10:status=published:isActive=true:query=electronics',
+        expect.any(Object),
+        10 * 1000,
+      );
+    });
+
+    it('should replace the category cache version after creating a category', async () => {
+      const createCategoryDto = {
+        name: 'Electronics',
+        status: StatusTypeEnum.PUBLISHED,
+      };
+      categoryRepository.findCategoryByName.mockResolvedValue(null);
+      categoryRepository.findCategoryBySlug.mockResolvedValue(null);
+      categoryRepository.createCategory.mockResolvedValue(baseCategory);
+
+      await service.createCategory(createCategoryDto);
+
+      expect(cacheManager.set).toHaveBeenCalledWith(
+        'categories:version',
+        expect.any(String),
+      );
+    });
   });
 
   describe('createCategory', () => {

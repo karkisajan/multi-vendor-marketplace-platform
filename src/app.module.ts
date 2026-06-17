@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call */
-import { MiddlewareConsumer, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { join } from 'path';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
@@ -13,7 +13,6 @@ import { CartModule } from './modules/cart/cart.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { SnakeNamingStrategy } from 'typeorm-naming-strategies';
 import { JwtModule } from '@nestjs/jwt';
-import { AuthenticationMiddleware } from './middlewares/authentication.middleware';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { CacheModule } from '@nestjs/cache-manager';
@@ -79,8 +78,4 @@ import Keyv from 'keyv';
     },
   ],
 })
-export class AppModule {
-  configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AuthenticationMiddleware).forRoutes('/categories');
-  }
-}
+export class AppModule {}
