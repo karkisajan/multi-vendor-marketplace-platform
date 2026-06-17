@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,10 +12,14 @@ import { generateSlug } from 'src/common/utils/generate-slug.util';
 import { validatePaginationFields } from 'src/common/utils/validate-pagination.util';
 import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
 import { FindOptionsWhere, ILike, IsNull } from 'typeorm';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 
 @Injectable()
 export class CategoryService {
-  constructor(private readonly categoryRepository: CategoryRepository) {}
+  constructor(
+    private readonly categoryRepository: CategoryRepository,
+    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
+  ) {}
 
   /**
    * Helper method to map filtering criteria (status, isActive, search query)
@@ -48,7 +53,7 @@ export class CategoryService {
   /**
    * ------ GET - parent-categories
    * Retrieves a paginated list of all top-level parent categories (where parentId is null).
-   * Validates pagination inputs and returns data along with standard pagination metadata.
+   * Validates pagination inputs and caches the response with standard pagination metadata.
    * @param page - Page number (1-indexed)
    * @param limit - Number of items to retrieve per page
    * @returns Object containing categories list and pagination metadata
@@ -61,6 +66,11 @@ export class CategoryService {
     limit: number;
   }) {
     const newLimit: number = validatePaginationFields(page, limit);
+
+    const cacheKey = `categories:parent:page=${page}:limit=${newLimit}`;
+    const cachedData = await this.cacheManager.get(cacheKey);
+    if (cachedData) return cachedData;
+
     const {
       categories,
       totalCategories,
@@ -70,35 +80,30 @@ export class CategoryService {
         limit: newLimit,
       });
 
-    if (totalCategories === 0) {
-      return {
-        data: [],
-        meta: {
-          page: page,
-          limit: newLimit,
-          total: 0,
-          totalPages: 0,
-        },
-      };
-    }
+    const result =
+      totalCategories === 0
+        ? {
+            data: [],
+            meta: { page: page, limit: newLimit, total: 0, totalPages: 0 },
+          }
+        : {
+            data: categories,
+            meta: {
+              page: page,
+              limit: newLimit,
+              total: totalCategories,
+              totalPages: Math.ceil(totalCategories / newLimit),
+            },
+          };
 
-    const totalPages: number =
-      totalCategories === 0 ? 0 : Math.ceil(totalCategories / newLimit);
-    return {
-      data: categories,
-      meta: {
-        page: page,
-        limit: newLimit,
-        total: totalCategories,
-        totalPages: totalPages,
-      },
-    };
+    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+    return result;
   }
 
   /**
    * ------ GET - flat categories
    * Retrieves a paginated list of all categories in a flat format, with optional filtering criteria applied.
-   * Validates pagination parameters and builds TypeORM query options to count matching records.
+   * Validates pagination parameters, builds TypeORM filter options, and caches the paginated response.
    * @param params - Object containing pagination options and filters (status, isActive, search query)
    * @returns Object containing categories list and pagination metadata
    */
@@ -117,6 +122,10 @@ export class CategoryService {
   }) {
     const newLimit: number = validatePaginationFields(page, limit);
 
+    const cacheKey = `categories:flat:page=${page}:limit=${newLimit}`;
+    const cachedData = await this.cacheManager.get(cacheKey);
+    if (cachedData) return cachedData;
+
     const whereCondition: FindOptionsWhere<Category> = this.filterCategories(
       status,
       isActive,
@@ -130,29 +139,24 @@ export class CategoryService {
         whereCondition,
       });
 
-    if (categories.length === 0) {
-      return {
-        data: [],
-        meta: {
-          page: page,
-          limit: newLimit,
-          total: 0,
-          totalPages: 0,
-        },
-      };
-    }
+    const result =
+      categories.length === 0
+        ? {
+            data: [],
+            meta: { page: page, limit: newLimit, total: 0, totalPages: 0 },
+          }
+        : {
+            data: [],
+            meta: {
+              page: page,
+              limit: newLimit,
+              total: totalCategories,
+              totalPages: Math.ceil(totalCategories / newLimit),
+            },
+          };
 
-    const totalPages: number =
-      totalCategories === 0 ? 0 : Math.ceil(totalCategories / newLimit);
-    return {
-      data: categories,
-      meta: {
-        page: page,
-        limit: newLimit,
-        total: totalCategories,
-        totalPages: totalPages,
-      },
-    };
+    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000);
+    return result;
   }
 
   /**
@@ -164,6 +168,17 @@ export class CategoryService {
   async getCategoryTree(): Promise<
     Array<Category & { children: Array<Category & { children: Category[] }> }>
   > {
+    const cacheKey = `categories:tree`;
+    const cachedData =
+      await this.cacheManager.get<
+        Array<
+          Category & { children: Array<Category & { children: Category[] }> }
+        >
+      >(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
     /* GET first level parent-categories */
     const firstLevelCategories: Category[] = await this.categoryRepository.find(
       {
@@ -208,6 +223,7 @@ export class CategoryService {
       });
     }
 
+    await this.cacheManager.set(cacheKey, result, 5 * 60 * 1000);
     return result;
   }
 
@@ -325,5 +341,52 @@ export class CategoryService {
     }
 
     return updated;
+  }
+
+  /**
+   * ------ DELETE - Delete category
+   * Removes an existing category after confirming it has no child categories.
+   * Returns a success payload with the deleted category ID.
+   * @throws NotFoundException if the category does not exist
+   * @throws ConflictException if any sub-categories still reference this category as parent
+   */
+  async deleteCategory(categoryId: string) {
+    const category: Category | null =
+      await this.categoryRepository.findCategoryById(categoryId);
+    if (!category) {
+      throw new NotFoundException('Category not found.');
+    }
+
+    if (category.parentId === null) {
+      const subChildCategories = await this.categoryRepository.find({
+        where: {
+          parentId: categoryId,
+        },
+      });
+
+      if (subChildCategories.length > 0) {
+        throw new ConflictException(
+          'Deletion failed. Sub-categories exists for this parent.',
+        );
+      }
+    } else if (category.parentId !== null) {
+      const subChildCategories = await this.categoryRepository.find({
+        where: {
+          parentId: categoryId,
+        },
+      });
+
+      if (subChildCategories.length > 0) {
+        throw new ConflictException(
+          'Deletion failed. Sub-categories exists for this parent.',
+        );
+      }
+    }
+
+    await this.categoryRepository.delete(categoryId);
+    return {
+      id: `${categoryId}`,
+      message: 'Category deleted successfully.',
+    };
   }
 }

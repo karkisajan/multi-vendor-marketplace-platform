@@ -35,6 +35,21 @@ export function ApiUpdateCategory() {
 }
 
 /**
+ * Swagger documentation decorator for category deletion.
+ */
+export function ApiDeleteCategory() {
+  return applyDecorators(
+    ApiOperation({ summary: 'Delete an existing category by ID (Admin only)' }),
+    ApiResponse({ status: 200, description: 'Category deleted successfully.' }),
+    ApiResponse({ status: 404, description: 'Category not found.' }),
+    ApiResponse({
+      status: 409,
+      description: 'Category cannot be deleted while it has sub-categories.',
+    }),
+  );
+}
+
+/**
  * Swagger documentation decorator for fetching categories in a flat list.
  */
 export function ApiGetFlatCategories() {

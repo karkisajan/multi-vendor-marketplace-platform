@@ -1,10 +1,20 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { CategoryService } from '../services/category.service';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
 import {
   ApiCreateCategory,
+  ApiDeleteCategory,
   ApiGetCategoryTree,
   ApiGetFlatCategories,
   ApiUpdateCategory,
@@ -69,5 +79,15 @@ export class AdminCategoryController {
     @Body() updateCategoryDto: UpdateCategoryDto,
   ) {
     return this.categoryService.updateCategory(id, updateCategoryDto);
+  }
+
+  /**
+   * ------ DELETE - Delete category by ID
+   * Deletes a category only when it exists and has no child categories attached.
+   */
+  @ApiDeleteCategory()
+  @Delete('/:id')
+  async deleteCategory(@Param('id') id: string) {
+    return this.categoryService.deleteCategory(id);
   }
 }
