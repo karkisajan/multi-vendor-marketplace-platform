@@ -7,12 +7,12 @@ import { UserRepository } from '../users/repositories/user.repository';
 import { CustomerProfileRepository } from '../users/repositories/customer-profile.repository';
 import { JwtTokenService } from './services/jwt-token.service';
 import { JwtModule } from '@nestjs/jwt';
-import { MailModule } from 'src/mail/mail.module';
-import { MailService } from 'src/mail/mail.service';
 import { CustomerProfile } from '../users/entities/customer-profile.entity';
 import { VendorProfile } from '../users/entities/vendor-profile.entity';
 import { VendorProfileRepository } from '../users/repositories/vendor-profile.repository';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { MailModule } from 'src/infrastructure/mail/mail.module';
+import { MailService } from 'src/infrastructure/mail/mail.service';
 
 @Module({
   imports: [

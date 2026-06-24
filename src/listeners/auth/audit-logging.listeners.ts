@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
+import { AuditLogRepository } from 'src/modules/audit-logs/repositories/audit-logs.repository';
+import { AUTH_EVENTS } from 'src/modules/auth/events/auth-event-names';
 import {
   CustomerForgetPasswordEvent,
   CustomerPasswordResetSuccessfulEvent,
   UserLoggedInEvent,
   UserRegistrationEvent,
-} from 'src/mail/events/auth.events';
-import { AuditLogRepository } from 'src/modules/audit-logs/repositories/audit-logs.repository';
+} from 'src/modules/auth/events/auth.events';
 
 @Injectable()
 export class AuditLoggingListener {

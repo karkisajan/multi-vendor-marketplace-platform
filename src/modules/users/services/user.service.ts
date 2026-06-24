@@ -1,4 +1,5 @@
 import {
+  Inject,
   Injectable,
   NotFoundException,
   UnauthorizedException,
@@ -11,6 +12,8 @@ import { User } from '../entities/user.entity';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 import { UpdateCustomerDto } from '../dto/user/update-customer.dto';
 import { UpdateVendorDto } from '../dto/user/update.-vendor.dto';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'node_modules/cache-manager/dist/index.cjs';
 
 @Injectable()
 export class UserService {
@@ -18,6 +21,8 @@ export class UserService {
     private readonly userRepository: UserRepository,
     private readonly customerProfileRepository: CustomerProfileRepository,
     private readonly vendorProfileRepository: VendorProfileRepository,
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
   ) {}
 
   /**
@@ -28,6 +33,10 @@ export class UserService {
    * fields for VENDOR users.
    */
   async getUserDetails(user: CurrentUserContext) {
+    const cacheKey = `user:${user.id}`;
+    const cachedData = await this.cacheManager.get(cacheKey);
+    if (cachedData) return cachedData;
+
     const userInformation: User | null = await this.userRepository.findUser(
       user.email,
     );
@@ -57,6 +66,7 @@ export class UserService {
             },
     };
 
+    await this.cacheManager.set(cacheKey, result, 60 * 1000);
     return result;
   }
 
@@ -93,6 +103,7 @@ export class UserService {
       );
     }
 
+    await this.cacheManager.del(`user:${user.id}`);
     return await this.getUserDetails(user);
   }
 
@@ -114,7 +125,7 @@ export class UserService {
     }
 
     await this.userRepository.softDeleteUser(user.id);
-
+    await this.cacheManager.del(`user:${user.id}`);
     return {
       message: 'Your account has been successfully deleted.',
     };

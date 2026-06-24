@@ -4,8 +4,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { MailService } from './mail.service';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
-import { AuthListener } from './listeners/auth/auth.listeners';
-import { AuditLoggingListener } from './listeners/auth/audit-logging.listeners';
+import { AuthListener } from '../../listeners/auth/auth.listeners';
+import { AuditLoggingListener } from '../../listeners/auth/audit-logging.listeners';
 import { AuditLogsModule } from 'src/modules/audit-logs/audit-logs.module';
 
 @Module({

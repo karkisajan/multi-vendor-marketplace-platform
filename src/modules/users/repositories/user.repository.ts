@@ -39,11 +39,7 @@ export class UserRepository extends Repository<User> {
     });
   }
 
-  /**
-   * GET - Retrieve a user by their primary key (UUID).
-   * Eagerly loads both profile relations so the caller can
-   * branch on the user's role without a second query.
-   */
+  /* GET - find user */
   async findUserById(userId: string): Promise<User | null> {
     return await this.findOne({
       where: { id: userId },
@@ -51,11 +47,7 @@ export class UserRepository extends Repository<User> {
     });
   }
 
-  /**
-   * DELETE (soft) - Mark a user as deleted via TypeORM's soft-delete.
-   * The `deletedAt` column is populated instead of physically removing
-   * the row, preserving audit history and enabling future recovery.
-   */
+  /* DELETE - user */
   async softDeleteUser(userId: string): Promise<void> {
     await this.softDelete(userId);
   }

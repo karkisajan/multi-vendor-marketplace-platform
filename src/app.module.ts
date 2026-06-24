@@ -15,18 +15,36 @@ import { JwtModule } from '@nestjs/jwt';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 import { CacheModule } from '@nestjs/cache-manager';
-import { RedisModule } from './redis/redis.module';
+import { AuthenticationMiddleware } from './middlewares/authentication.middleware';
+import { RedisModule } from './infrastructure/redis/redis.module';
 import KeyvRedis from '@keyv/redis';
 import Keyv from 'keyv';
-import { AuthenticationMiddleware } from './middlewares/authentication.middleware';
+import { ThrottlerModule } from '@nestjs/throttler';
+import Redis from 'ioredis';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-
-    // Redis cache-manager setup
+    EventEmitterModule.forRoot(),
+    JwtModule.register({}),
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'login',
+          ttl: 60000,
+          limit: 5,
+        },
+      ],
+      storage: new ThrottlerStorageRedisService(
+        new Redis({
+          host: process.env.REDIS_HOST,
+          port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+        }),
+      ),
+    }),
     CacheModule.registerAsync({
       isGlobal: true,
       inject: [ConfigService],
@@ -41,10 +59,6 @@ import { AuthenticationMiddleware } from './middlewares/authentication.middlewar
         ttl: 60 * 1000,
       }),
     }),
-
-    // Event-Emitter for event-based logging
-    EventEmitterModule.forRoot(),
-    JwtModule.register({}),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

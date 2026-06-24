@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { ApiTags } from '@nestjs/swagger';
 import { RegisterCustomerDto } from 'src/modules/users/dto/auth/register-customer.dto';
@@ -15,6 +15,7 @@ import { RegisterVendorDto } from 'src/modules/users/dto/auth/register-vendor.dt
 import { ForgetPasswordDto } from 'src/modules/users/dto/auth/forget-password.dto';
 import { ResetPasswordDto } from 'src/modules/users/dto/auth/reset-password.dto';
 import { IpAddress } from 'src/common/decorators/ip-address.decorator';
+import { RateLimitterGuard } from 'src/common/guards/rate-limitter.guard';
 
 @ApiTags('Auth')
 @Controller('/auth/users')
@@ -58,6 +59,7 @@ export class AuthController {
    * Accepts login credentials and delegates authentication to AuthService.
    */
   @ApiLoginUser()
+  @UseGuards(RateLimitterGuard)
   @Post('/login')
   async loginUser(
     @Body() loginUserDto: LoginUserDto,
@@ -71,6 +73,7 @@ export class AuthController {
    * Accepts a refresh token and delegates token renewal to AuthService.
    */
   @ApiRefreshToken()
+  @UseGuards(RateLimitterGuard)
   @Post('/refresh-token')
   async refreshToken(@Body() refreshTokenDto: RefreshTokenDto) {
     return await this.authService.refreshToken(refreshTokenDto);
@@ -81,6 +84,7 @@ export class AuthController {
    * Accepts the user email and delegates password reset initiation to AuthService.
    */
   @ApiForgetPassword()
+  @UseGuards(RateLimitterGuard)
   @Post('/forget-password')
   async forgetPassword(
     @Body() forgetPasswordDto: ForgetPasswordDto,
@@ -97,6 +101,7 @@ export class AuthController {
    * Accepts the reset token and new password; delegates password update to AuthService.
    */
   @ApiResetPassword()
+  @UseGuards(RateLimitterGuard)
   @Post('/reset-password')
   async resetPassword(
     @Body() resetPasswordDto: ResetPasswordDto,

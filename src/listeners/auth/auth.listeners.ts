@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
+import { MailService } from 'src/infrastructure/mail/mail.service';
+import { AUTH_EVENTS } from 'src/modules/auth/events/auth-event-names';
 import {
   CustomerForgetPasswordEvent,
   CustomerPasswordResetSuccessfulEvent,
   UserRegistrationEvent,
   VendorRegistrationEvent,
-} from 'src/mail/events/auth.events';
-import { MailService } from 'src/mail/mail.service';
+} from 'src/modules/auth/events/auth.events';
 
 @Injectable()
 export class AuthListener {

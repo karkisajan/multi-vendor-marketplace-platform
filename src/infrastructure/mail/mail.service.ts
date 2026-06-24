@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
-import { CustomerPasswordResetSuccessfulEvent } from './events/auth.events';
+import { CustomerPasswordResetSuccessfulEvent } from '../../modules/auth/events/auth.events';
 
 @Injectable()
 export class MailService {

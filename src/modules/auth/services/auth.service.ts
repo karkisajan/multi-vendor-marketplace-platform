@@ -16,13 +16,6 @@ import { RefreshTokenDto } from 'src/modules/users/dto/auth/refresh-token.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
-import {
-  CustomerForgetPasswordEvent,
-  CustomerPasswordResetSuccessfulEvent,
-  UserLoggedInEvent,
-  UserRegistrationEvent,
-} from 'src/mail/events/auth.events';
 import { RegisterVendorDto } from 'src/modules/users/dto/auth/register-vendor.dto';
 import { VendorProfileRepository } from 'src/modules/users/repositories/vendor-profile.repository';
 import { VendorProfile } from 'src/modules/users/entities/vendor-profile.entity';
@@ -31,6 +24,13 @@ import { CustomerProfile } from 'src/modules/users/entities/customer-profile.ent
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 import { ForgetPasswordDto } from 'src/modules/users/dto/auth/forget-password.dto';
 import { ResetPasswordDto } from 'src/modules/users/dto/auth/reset-password.dto';
+import { AUTH_EVENTS } from '../events/auth-event-names';
+import {
+  CustomerForgetPasswordEvent,
+  CustomerPasswordResetSuccessfulEvent,
+  UserLoggedInEvent,
+  UserRegistrationEvent,
+} from '../events/auth.events';
 
 interface JwtPayload {
   id: string;
