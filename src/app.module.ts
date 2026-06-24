@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { join } from 'path';
