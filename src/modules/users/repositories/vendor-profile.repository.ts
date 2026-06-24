@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { VendorProfile } from '../entities/vendor-profile.entity';
-import { RegisterVendorDto } from '../dto/register-vendor.dto';
+import { RegisterVendorDto } from '../dto/auth/register-vendor.dto';
+import { UpdateVendorDto } from '../dto/user/update.-vendor.dto';
 
 @Injectable()
 export class VendorProfileRepository extends Repository<VendorProfile> {
@@ -22,5 +23,13 @@ export class VendorProfileRepository extends Repository<VendorProfile> {
     });
 
     return await manager.save(VendorProfile, userProfile);
+  }
+
+  /* PUT - update vendor profile */
+  async updateVendorProfile(
+    userId: string,
+    updateVendorDto: UpdateVendorDto,
+  ): Promise<void> {
+    await this.update({ userId }, updateVendorDto);
   }
 }

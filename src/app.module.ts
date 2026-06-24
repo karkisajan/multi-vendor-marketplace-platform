@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { join } from 'path';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
@@ -18,6 +18,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { RedisModule } from './redis/redis.module';
 import KeyvRedis from '@keyv/redis';
 import Keyv from 'keyv';
+import { AuthenticationMiddleware } from './middlewares/authentication.middleware';
 
 @Module({
   imports: [
@@ -77,4 +78,11 @@ import Keyv from 'keyv';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(AuthenticationMiddleware)
+      .exclude('/auth')
+      .forRoutes('/users');
+  }
+}

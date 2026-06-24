@@ -10,9 +10,9 @@ import { User } from 'src/modules/users/entities/user.entity';
 import { CustomerProfileRepository } from 'src/modules/users/repositories/customer-profile.repository';
 import { normalizedEmail } from 'src/common/utils/normalize-email.util';
 import { DataSource, EntityManager } from 'typeorm';
-import { LoginUserDto } from 'src/modules/users/dto/login-user.dto';
+import { LoginUserDto } from 'src/modules/users/dto/auth/login-user.dto';
 import { JwtTokenService } from './jwt-token.service';
-import { RefreshTokenDto } from 'src/modules/users/dto/refresh-token.dto';
+import { RefreshTokenDto } from 'src/modules/users/dto/auth/refresh-token.dto';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -23,14 +23,14 @@ import {
   UserLoggedInEvent,
   UserRegistrationEvent,
 } from 'src/mail/events/auth.events';
-import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
+import { RegisterVendorDto } from 'src/modules/users/dto/auth/register-vendor.dto';
 import { VendorProfileRepository } from 'src/modules/users/repositories/vendor-profile.repository';
 import { VendorProfile } from 'src/modules/users/entities/vendor-profile.entity';
-import { RegisterCustomerDto } from 'src/modules/users/dto/register-customer.dto';
+import { RegisterCustomerDto } from 'src/modules/users/dto/auth/register-customer.dto';
 import { CustomerProfile } from 'src/modules/users/entities/customer-profile.entity';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
-import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
-import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
+import { ForgetPasswordDto } from 'src/modules/users/dto/auth/forget-password.dto';
+import { ResetPasswordDto } from 'src/modules/users/dto/auth/reset-password.dto';
 
 interface JwtPayload {
   id: string;
@@ -82,6 +82,7 @@ export class AuthService {
     const jwtTokenRes = await this.jwtTokenService.jwtSignToken(
       user.id,
       user.email,
+      user.role,
     );
 
     return {

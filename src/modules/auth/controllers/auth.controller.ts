@@ -1,9 +1,9 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { AuthService } from '../services/auth.service';
 import { ApiTags } from '@nestjs/swagger';
-import { RegisterCustomerDto } from 'src/modules/users/dto/register-customer.dto';
-import { LoginUserDto } from 'src/modules/users/dto/login-user.dto';
-import { RefreshTokenDto } from 'src/modules/users/dto/refresh-token.dto';
+import { RegisterCustomerDto } from 'src/modules/users/dto/auth/register-customer.dto';
+import { LoginUserDto } from 'src/modules/users/dto/auth/login-user.dto';
+import { RefreshTokenDto } from 'src/modules/users/dto/auth/refresh-token.dto';
 import {
   ApiForgetPassword,
   ApiLoginUser,
@@ -11,9 +11,9 @@ import {
   ApiRegisterUser,
   ApiResetPassword,
 } from 'src/modules/users/decorators/auth-swagger.decorator';
-import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
-import { ForgetPasswordDto } from 'src/modules/users/dto/forget-password.dto';
-import { ResetPasswordDto } from 'src/modules/users/dto/reset-password.dto';
+import { RegisterVendorDto } from 'src/modules/users/dto/auth/register-vendor.dto';
+import { ForgetPasswordDto } from 'src/modules/users/dto/auth/forget-password.dto';
+import { ResetPasswordDto } from 'src/modules/users/dto/auth/reset-password.dto';
 import { IpAddress } from 'src/common/decorators/ip-address.decorator';
 
 @ApiTags('Auth')

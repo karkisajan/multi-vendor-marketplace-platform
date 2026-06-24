@@ -23,8 +23,8 @@ import {
   UserLoggedInEvent,
   UserRegistrationEvent,
 } from 'src/mail/events/auth.events';
-import { RegisterCustomerDto } from 'src/modules/users/dto/register-customer.dto';
-import { RegisterVendorDto } from 'src/modules/users/dto/register-vendor.dto';
+import { RegisterCustomerDto } from 'src/modules/users/dto/auth/register-customer.dto';
+import { RegisterVendorDto } from 'src/modules/users/dto/auth/register-vendor.dto';
 
 jest.mock('argon2');
 

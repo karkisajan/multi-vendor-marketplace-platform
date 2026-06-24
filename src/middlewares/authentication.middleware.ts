@@ -7,13 +7,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { Request, Response, NextFunction } from 'express';
-interface JwtPayload {
-  id: string;
-  email: string;
-}
-interface IGetUserAuthInfoRequest extends Request {
-  user: JwtPayload;
-}
+import {
+  IGetUserAuthInfoRequest,
+  JwtPayload,
+} from 'src/modules/users/types/user.types';
+
 @Injectable()
 export class AuthenticationMiddleware implements NestMiddleware {
   private readonly logger = new Logger(AuthenticationMiddleware.name);
@@ -26,7 +24,9 @@ export class AuthenticationMiddleware implements NestMiddleware {
   use(req: IGetUserAuthInfoRequest, res: Response, next: NextFunction) {
     const authHeadersToken: string | null = this.extractAuthHeadersToken(req);
     if (!authHeadersToken) {
-      throw new UnauthorizedException('Invalid authenticaiton token.');
+      throw new UnauthorizedException(
+        'Invalid authentication token. Please try again.',
+      );
     }
 
     try {
@@ -35,13 +35,31 @@ export class AuthenticationMiddleware implements NestMiddleware {
           secret: this.configService.get<string>('JWT_SECRET_KEY'),
         });
 
-      req.user = verifiedAuthHeadersToken;
+      if (!verifiedAuthHeadersToken.id || !verifiedAuthHeadersToken.email) {
+        throw new UnauthorizedException(
+          'Malformed authentication token payload.',
+        );
+      }
 
+      req.user = verifiedAuthHeadersToken;
       next();
     } catch (error) {
-      this.logger.log(error);
+      if (error instanceof UnauthorizedException) throw error;
+
+      if (error instanceof Error && error.name === 'TokenExpiredError') {
+        this.logger.warn(
+          `Jwt verification failed. Token has expired. Please login again. ${error}`,
+        );
+        throw new UnauthorizedException(
+          'Authentication token has expired. Please login again.',
+        );
+      }
+
+      this.logger.error(
+        `Jwt verification failed. Missing authentication or token is invalid. ${error}`,
+      );
       throw new UnauthorizedException(
-        `Invalid authentication token or token has expired.`,
+        `Invalid authentication token. Please try again.`,
       );
     }
   }

@@ -3,10 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { UserRepository } from 'src/modules/users/repositories/user.repository';
 import * as argon from 'argon2';
+import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 
 interface JwtPayload {
   id: string;
   email: string;
+  role: UserRoleEnum;
 }
 
 @Injectable()
@@ -20,10 +22,11 @@ export class JwtTokenService {
   /**
    * Signs access and refresh JWT tokens, persists the hashed refresh token with expiry on the user record, and returns both tokens.
    */
-  async jwtSignToken(id: string, email: string) {
+  async jwtSignToken(id: string, email: string, role: UserRoleEnum) {
     const jwtPayload: JwtPayload = {
       id: id,
       email: email,
+      role: role,
     };
 
     /* Access Token */
