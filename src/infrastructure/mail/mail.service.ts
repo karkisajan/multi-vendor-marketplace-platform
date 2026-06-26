@@ -16,7 +16,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: user.email,
       subject: `Account registration confirmation.`,
-      template: './customer-registration.hbs',
+      template: './send-customer-registration-email.hbs',
       context: {
         username: user.username,
         time: new Date().toLocaleString(),
@@ -32,7 +32,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: vendor.email,
       subject: `Account registration confirmation.`,
-      template: './vendor-registration.hbs',
+      template: './send-vendor-registration-email.hbs',
       context: {
         businessName: vendor.businessName,
         time: new Date().toLocaleDateString(),
@@ -49,7 +49,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: user.email,
       subject: `Password reset request`,
-      template: './forget-password',
+      template: './send-forget-password-email',
       context: {
         username: user.username,
         resetLink: user.resetPasswordToken,
@@ -64,7 +64,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: user.email,
       subject: `Password reset successful`,
-      template: './password-reset-successful',
+      template: './send-password-reset-successful-email',
       context: {
         username: user.username,
       },

@@ -35,6 +35,7 @@ import {
 interface JwtPayload {
   id: string;
   email: string;
+  role: UserRoleEnum;
 }
 
 @Injectable()
@@ -283,17 +284,9 @@ export class AuthService {
    * @throws UnauthorizedException when the user is not found, the token hash does not match, or the token has expired
    */
   async refreshToken(refreshTokenDto: RefreshTokenDto) {
-    const { refreshToken } = refreshTokenDto;
-
-    /* Verify the refresh token payload with JwtRefreshTokenKey */
-    const payload: JwtPayload = this.jwtService.verify<JwtPayload>(
-      refreshToken,
-      {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET_KEY'),
-      },
+    const payload: JwtPayload = this.jwtTokenService.verifyRefreshToken(
+      refreshTokenDto.refreshToken,
     );
-
-    /* GET user and verify the user-password */
     const user: User | null = await this.userRepository.findUser(payload.email);
     if (!user) {
       throw new UnauthorizedException('Invalid email. Please try again.');
@@ -301,13 +294,14 @@ export class AuthService {
 
     const isPasswordVerified: boolean = await argon.verify(
       user.refreshToken,
-      refreshToken,
+      refreshTokenDto.refreshToken,
     );
     if (!isPasswordVerified) {
-      throw new UnauthorizedException('Invalid password. Please try again.');
+      throw new UnauthorizedException(
+        'Invalid or expired refresh-token. Please try again.',
+      );
     }
 
-    /* Verify the JwtTokenRefreshKey is past the date of current date */
     if (
       user &&
       (!user.refreshTokenExpiryDate ||
@@ -340,19 +334,17 @@ export class AuthService {
     const payload: JwtPayload = {
       id: user.id,
       email: user.email,
+      role: user.role,
     };
-    const resetToken: string = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_PASSWORD_RESET_SECRET_KEY'),
-      expiresIn: '15m',
-    });
-
-    const hashedResetPasswordToken: string = await argon.hash(resetToken);
-    const resetPasswordExpiryDate: Date = new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
+    const resetToken: string = await this.jwtTokenService.generateAndSaveToken(
+      user.id,
+      payload,
+      this.configService.get<string>('JWT_PASSWORD_RESET_SECRET_KEY'),
+      '7d',
+      'resetPasswordToken',
+      'resetPasswordTokenExpiryDate',
+      new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     );
-    user.resetPasswordToken = hashedResetPasswordToken;
-    user.resetPasswordTokenExpiryDate = resetPasswordExpiryDate;
-    await this.userRepository.save(user);
 
     if (user.role === UserRoleEnum.CUSTOMER) {
       this.eventEmitter.emit(
@@ -383,11 +375,8 @@ export class AuthService {
     resetPasswordDto: ResetPasswordDto,
     userIpAddress: string,
   ) {
-    const payload: JwtPayload = this.jwtService.verify(
+    const payload: JwtPayload = this.jwtTokenService.verifyResetToken(
       resetPasswordDto.resetToken,
-      {
-        secret: this.configService.get<string>('JWT_PASSWORD_RESET_SECRET_KEY'),
-      },
     );
 
     const user: User | null = await this.userRepository.findUser(
