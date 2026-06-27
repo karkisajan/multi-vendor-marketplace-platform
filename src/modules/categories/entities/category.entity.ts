@@ -1,9 +1,11 @@
 import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
+import { Product } from 'src/modules/products/entities/product.entity';
 import {
   Column,
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
@@ -37,6 +39,9 @@ export class Category {
 
   @Column({ type: 'uuid', nullable: true })
   parentId: string | null;
+
+  @OneToMany(() => Product, (product) => product.category, { cascade: true })
+  products: Product[];
 
   @CreateDateColumn()
   createdAt: Date;

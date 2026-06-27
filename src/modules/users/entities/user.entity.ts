@@ -14,6 +14,7 @@ import { UserStatusEnum } from 'src/common/enums/user-status.enum';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 import { VendorProfile } from './vendor-profile.entity';
 import { AuditLog } from 'src/modules/audit-logs/entities/audit-logs.entity';
+import { Product } from 'src/modules/products/entities/product.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -79,4 +80,8 @@ export class User {
   /* One to many relation (user to audit logs) can have multiple audit logs */
   @OneToMany(() => AuditLog, (auditLog) => auditLog.user)
   auditLogs: AuditLog[];
+
+  /* One to many relation (A vendor business can have multiple products) */
+  @OneToMany(() => Product, (product) => product.user, { cascade: true })
+  products: Product[];
 }
