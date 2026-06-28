@@ -13,7 +13,6 @@ import { DataSource, EntityManager } from 'typeorm';
 import { LoginUserDto } from 'src/modules/users/dto/auth/login-user.dto';
 import { JwtTokenService } from './jwt-token.service';
 import { RefreshTokenDto } from 'src/modules/users/dto/auth/refresh-token.dto';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RegisterVendorDto } from 'src/modules/users/dto/auth/register-vendor.dto';
@@ -30,6 +29,7 @@ import {
   CustomerPasswordResetSuccessfulEvent,
   UserLoggedInEvent,
   UserRegistrationEvent,
+  VendorLoggedInEvent,
 } from '../events/auth.events';
 
 interface JwtPayload {
@@ -47,7 +47,6 @@ export class AuthService {
     private readonly jwtTokenService: JwtTokenService,
 
     private readonly dataSource: DataSource,
-    private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -268,6 +267,16 @@ export class AuthService {
           user.id,
           user.email,
           `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+          userIpAddress,
+        ),
+      );
+    } else if (user.role === UserRoleEnum.VENDOR) {
+      this.eventEmitter.emit(
+        AUTH_EVENTS.VENDOR_LOGGED_IN,
+        new VendorLoggedInEvent(
+          user.id,
+          user.email,
+          `${user.vendorProfile.businessName}`,
           userIpAddress,
         ),
       );

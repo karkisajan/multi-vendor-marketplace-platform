@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
-import { CreateProductDto } from '../dto/create-product.dto';
+import { CreateProductDto } from '../dto/vendor/create-product.dto';
 import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 
 @Injectable()

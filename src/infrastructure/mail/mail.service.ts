@@ -16,7 +16,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: user.email,
       subject: `Account registration confirmation.`,
-      template: './send-customer-registration-email.hbs',
+      template: './send-customer-registration-email',
       context: {
         username: user.username,
         time: new Date().toLocaleString(),
@@ -32,7 +32,7 @@ export class MailService {
     await this.mailerService.sendMail({
       to: vendor.email,
       subject: `Account registration confirmation.`,
-      template: './send-vendor-registration-email.hbs',
+      template: './send-vendor-registration-email',
       context: {
         businessName: vendor.businessName,
         time: new Date().toLocaleDateString(),

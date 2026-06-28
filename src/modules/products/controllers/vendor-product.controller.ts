@@ -3,10 +3,10 @@ import { ApiTags } from '@nestjs/swagger';
 import { GetCurrentUser } from 'src/common/decorators/get-current-user.decorator';
 import { CurrentUserContext } from 'src/modules/users/types/user.types';
 import { ProductService } from '../services/product.service';
-import { CreateProductDto } from '../dto/create-product.dto';
-import { UpdateProductDto } from '../dto/update-product.dto';
-import { CreateProductVariantDto } from '../dto/create-product-variant.dto';
-import { UpdateProductVariantDto } from '../dto/update-product-variant.dto';
+import { CreateProductDto } from '../dto/vendor/create-product.dto';
+import { UpdateProductDto } from '../dto/vendor/update-product.dto';
+import { CreateProductVariantDto } from '../dto/vendor/create-product-variant.dto';
+import { UpdateProductVariantDto } from '../dto/vendor/update-product-variant.dto';
 import {
   ApiVendorCreateProduct,
   ApiVendorCreateVariant,

@@ -4,6 +4,10 @@
   "sourceRoot": "src",
   "compilerOptions": {
     "deleteOutDir": true,
-    "assets": ["mail/templates/**/*", "i18n/**/*"]
+    "assets": [
+      { "include": "/infrastructure/mail/templates/**/*", "outDir": "dist" },
+      { "include": "i18n/**/*", "outDir": "dist" }
+    ],
+    "watchAssets": true
   }
 }

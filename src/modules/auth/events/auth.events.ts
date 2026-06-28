@@ -41,3 +41,12 @@ export class VendorRegistrationEvent {
     public readonly businessName: string,
   ) {}
 }
+
+export class VendorLoggedInEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly email: string,
+    public readonly businessName: string,
+    public readonly ipAddress: string,
+  ) {}
+}

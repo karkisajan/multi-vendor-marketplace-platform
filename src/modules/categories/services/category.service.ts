@@ -44,9 +44,6 @@ export class CategoryService {
   /**
    * Helper method to map filtering criteria (status, isActive, search query)
    * to a TypeORM FindOptionsWhere conditions object.
-   * @param status - Filter by publication status
-   * @param isActive - Filter by category visibility
-   * @param query - Case-insensitive partial match query for category name
    */
   private filterCategories(
     status?: StatusTypeEnum,
@@ -70,13 +67,11 @@ export class CategoryService {
     return whereCondition;
   }
 
+  /* =============== Customer specific services */
   /**
    * ------ GET - parent-categories
    * Retrieves a paginated list of all top-level parent categories (where parentId is null).
    * Validates pagination inputs and caches the response with standard pagination metadata.
-   * @param page - Page number (1-indexed)
-   * @param limit - Number of items to retrieve per page
-   * @returns Object containing categories list and pagination metadata
    */
   async getAllParentCategories({
     page,
@@ -123,12 +118,11 @@ export class CategoryService {
     return result;
   }
 
+  /* ============== Admin specific services */
   /**
    * ------ GET - flat categories
    * Retrieves a paginated list of all categories in a flat format, with optional filtering criteria applied.
    * Validates pagination parameters, builds TypeORM filter options, and caches each filter set separately.
-   * @param params - Object containing pagination options and filters (status, isActive, search query)
-   * @returns Object containing categories list and pagination metadata
    */
   async getFlatCategories({
     page,
@@ -257,10 +251,6 @@ export class CategoryService {
    * ------ POST - Create category
    * Creates a new category. Ensures name uniqueness and checks parent category existence if parentId is provided.
    * Generates a unique slug, persists it in the database, and advances the category cache version.
-   * @param createCategoryDto - Category definition payload
-   * @returns Saved category details including generated ID and slug
-   * @throws NotFoundException if the referenced parent category does not exist
-   * @throws ConflictException if a category with the same name or generated slug already exists
    */
   async createCategory(createCategoryDto: CreateCategoryDto) {
     if (createCategoryDto.parentId) {
@@ -310,11 +300,6 @@ export class CategoryService {
    * Updates fields of an existing category by its ID.
    * If name changes, it checks for name uniqueness and regenerates the slug.
    * If parentId changes, it prevents self-parenting, ensures the parent exists, and advances cached category reads.
-   * @param id - Category ID to update
-   * @param updateCategoryDto - Fields to update
-   * @returns The updated category record
-   * @throws NotFoundException if the category or the new parent category is not found
-   * @throws ConflictException if name/slug conflicts occur or if the category is assigned as its own parent
    */
   async updateCategory(
     id: string,
@@ -376,8 +361,6 @@ export class CategoryService {
    * ------ DELETE - Delete category
    * Removes an existing category after confirming it has no child categories.
    * Advances the category cache version so list and tree endpoints stop using stale keys.
-   * @throws NotFoundException if the category does not exist
-   * @throws ConflictException if any sub-categories still reference this category as parent
    */
   async deleteCategory(categoryId: string) {
     const category: Category | null =

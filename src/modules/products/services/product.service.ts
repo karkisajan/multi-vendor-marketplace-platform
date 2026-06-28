@@ -5,12 +5,12 @@ import {
 } from '@nestjs/common';
 import { ProductRepository } from '../repositories/product.repository';
 import { ProductVariantRepository } from '../repositories/product-variant.repository';
-import { CreateProductDto } from '../dto/create-product.dto';
-import { UpdateProductDto } from '../dto/update-product.dto';
-import { CreateProductVariantDto } from '../dto/create-product-variant.dto';
-import { UpdateProductVariantDto } from '../dto/update-product-variant.dto';
-import { UpdateProductStatusDto } from '../dto/update-product-status.dto';
-import { AdminUpdateProductDto } from '../dto/admin-update-product.dto';
+import { CreateProductDto } from '../dto/vendor/create-product.dto';
+import { UpdateProductDto } from '../dto/vendor/update-product.dto';
+import { CreateProductVariantDto } from '../dto/vendor/create-product-variant.dto';
+import { UpdateProductVariantDto } from '../dto/vendor/update-product-variant.dto';
+import { UpdateProductStatusDto } from '../dto/admin/update-product-status.dto';
+import { AdminUpdateProductDto } from '../dto/admin/admin-update-product.dto';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { generateSlug } from 'src/common/utils/generate-slug.util';
@@ -31,10 +31,6 @@ export class ProductService {
    * ------ POST - Create product (Vendor)
    * Creates a new product for the authenticated vendor with DRAFT status.
    * Generates a unique slug from the product name and validates uniqueness before persisting.
-   * @param createProductDto - Product creation payload
-   * @param vendorId - ID of the authenticated vendor extracted from JWT
-   * @returns Newly created product with generated slug and DRAFT status
-   * @throws ConflictException if a product with the generated slug already exists
    */
   async createProduct(createProductDto: CreateProductDto, vendorId: string) {
     const categoryExists: Category | null =
@@ -75,12 +71,6 @@ export class ProductService {
    * Updates an existing product owned by the vendor. Only name, description, and categoryId can be changed.
    * Regenerates the slug when the name changes and validates uniqueness.
    * Status is never modifiable through this endpoint — vendors cannot bypass admin review.
-   * @param productId - UUID of the product to update
-   * @param updateProductDto - Fields to update
-   * @param vendorId - ID of the authenticated vendor extracted from JWT
-   * @returns The updated product record
-   * @throws NotFoundException if the product does not exist or is not owned by this vendor
-   * @throws ConflictException if the new slug conflicts with another product
    */
   async updateProduct(
     productId: string,
@@ -140,11 +130,6 @@ export class ProductService {
    * ------ DELETE - Delete product (Vendor)
    * Deletes a product only if the vendor owns it and its status is DRAFT.
    * Published or archived products must be reverted to DRAFT before deletion.
-   * @param productId - UUID of the product to delete
-   * @param vendorId - ID of the authenticated vendor extracted from JWT
-   * @returns Confirmation message with the deleted product ID
-   * @throws NotFoundException if the product does not exist or is not owned by this vendor
-   * @throws ForbiddenException if the product is not in DRAFT status
    */
   async deleteProduct(productId: string, vendorId: string) {
     const product: Product | null =
@@ -167,11 +152,6 @@ export class ProductService {
    * ------ POST - Create variant (Vendor)
    * Adds a new variant with pricing and attributes to a product owned by the vendor.
    * If isDefault is true and another default variant exists, this new one will take precedence.
-   * @param productId - UUID of the product to attach the variant to
-   * @param createProductVariantDto - Variant creation payload with price and attributes
-   * @param vendorId - ID of the authenticated vendor extracted from JWT
-   * @returns Newly created variant details
-   * @throws NotFoundException if the product does not exist or is not owned by this vendor
    */
   async createVariant(
     productId: string,
@@ -215,11 +195,6 @@ export class ProductService {
    * ------ PUT - Update variant (Vendor)
    * Updates price, stock, or attributes on a variant that belongs to a product owned by the vendor.
    * Verifies variant ownership through its parent product's vendorId.
-   * @param variantId - UUID of the variant to update
-   * @param updateProductVariantDto - Fields to update
-   * @param vendorId - ID of the authenticated vendor extracted from JWT
-   * @returns The updated variant record
-   * @throws NotFoundException if the variant does not exist or is not owned by this vendor
    */
   async updateVariant(
     variantId: string,
@@ -275,11 +250,6 @@ export class ProductService {
    * ------ DELETE - Delete variant (Vendor)
    * Removes a variant from a product, enforcing the business rule that at least one variant must remain.
    * Verifies variant ownership through its parent product's vendorId before deletion.
-   * @param variantId - UUID of the variant to delete
-   * @param vendorId - ID of the authenticated vendor extracted from JWT
-   * @returns Confirmation message with the deleted variant ID
-   * @throws NotFoundException if the variant does not exist or is not owned by this vendor
-   * @throws ConflictException if this is the last remaining variant on the product
    */
   async deleteVariant(variantId: string, vendorId: string) {
     const variant: ProductVariant | null =
@@ -312,10 +282,6 @@ export class ProductService {
    * ------ PUT - Update product status (Admin)
    * Transitions a product through lifecycle states: publish, reject, or archive.
    * Accepts an optional reviewNote for admin feedback visible to the vendor.
-   * @param productId - UUID of the product to update
-   * @param updateProductStatusDto - New status and optional review note
-   * @returns The updated product record with new status
-   * @throws NotFoundException if the product does not exist
    */
   async adminUpdateProductStatus(
     productId: string,
@@ -349,11 +315,6 @@ export class ProductService {
    * Allows admin to update any product field including name, description, slug, categoryId, and status.
    * If name changes without an explicit slug, regenerates the slug and checks for conflicts.
    * If a slug is explicitly provided, it is used directly after conflict validation.
-   * @param productId - UUID of the product to update
-   * @param adminUpdateProductDto - Fields to force-update
-   * @returns The updated product record
-   * @throws NotFoundException if the product does not exist
-   * @throws ConflictException if the new slug conflicts with another product
    */
   async adminUpdateProduct(
     productId: string,
@@ -423,9 +384,6 @@ export class ProductService {
    * ------ DELETE - Hard delete product (Admin)
    * Permanently removes a product and all its associated variants from the database.
    * Unlike vendor deletion, admin deletion works on any product regardless of status.
-   * @param productId - UUID of the product to hard delete
-   * @returns Confirmation message with the deleted product ID
-   * @throws NotFoundException if the product does not exist
    */
   async adminDeleteProduct(productId: string) {
     const product: Product | null =

@@ -104,7 +104,9 @@ async function seedUsers(): Promise<void> {
   }
 
   console.log(`Vendors: ${vendorsCreated} created, ${vendorsSkipped} skipped`);
-  console.log(`\nSeed complete. Default password for all users: ${SEED_PASSWORD}`);
+  console.log(
+    `\nSeed complete. Default password for all users: ${SEED_PASSWORD}`,
+  );
   console.log(`Admin login: ${ADMIN_EMAIL}`);
   console.log(`Customer sample: customer1@example.com`);
   console.log(`Vendor sample: vendor1@example.com`);

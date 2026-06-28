@@ -1,8 +1,8 @@
 import { Body, Controller, Delete, Param, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
-import { UpdateProductStatusDto } from '../dto/update-product-status.dto';
-import { AdminUpdateProductDto } from '../dto/admin-update-product.dto';
+import { UpdateProductStatusDto } from '../dto/admin/update-product-status.dto';
+import { AdminUpdateProductDto } from '../dto/admin/admin-update-product.dto';
 import {
   ApiAdminDeleteProduct,
   ApiAdminUpdateProduct,

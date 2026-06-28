@@ -1,11 +1,11 @@
 import { applyDecorators } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
-import { CreateProductDto } from '../dto/create-product.dto';
-import { UpdateProductDto } from '../dto/update-product.dto';
-import { CreateProductVariantDto } from '../dto/create-product-variant.dto';
-import { UpdateProductVariantDto } from '../dto/update-product-variant.dto';
-import { UpdateProductStatusDto } from '../dto/update-product-status.dto';
-import { AdminUpdateProductDto } from '../dto/admin-update-product.dto';
+import { CreateProductDto } from '../dto/vendor/create-product.dto';
+import { UpdateProductDto } from '../dto/vendor/update-product.dto';
+import { CreateProductVariantDto } from '../dto/vendor/create-product-variant.dto';
+import { UpdateProductVariantDto } from '../dto/vendor/update-product-variant.dto';
+import { UpdateProductStatusDto } from '../dto/admin/update-product-status.dto';
+import { AdminUpdateProductDto } from '../dto/admin/admin-update-product.dto';
 
 // ───────────────────────────── VENDOR PRODUCT ─────────────────────────────
 

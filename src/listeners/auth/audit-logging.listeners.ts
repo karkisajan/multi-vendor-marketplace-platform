@@ -7,6 +7,7 @@ import {
   CustomerPasswordResetSuccessfulEvent,
   UserLoggedInEvent,
   UserRegistrationEvent,
+  VendorLoggedInEvent,
 } from 'src/modules/auth/events/auth.events';
 
 @Injectable()
@@ -43,6 +44,23 @@ export class AuditLoggingListener {
     } catch (error) {
       this.logger.error(
         `Failed to create audit log for customer login. User ID: ${event.userId}`,
+        error,
+      );
+    }
+  }
+
+  @OnEvent(AUTH_EVENTS.CUSTOMER_LOGGED_IN)
+  async handleVendorLoggedIn(event: VendorLoggedInEvent) {
+    try {
+      await this.auditLogRepository.createAuditLog(
+        'VENDOR_LOGGED_IN',
+        event.userId,
+        event.email,
+        event.ipAddress,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to create audit log for vendor login. User ID: ${event.userId}`,
         error,
       );
     }
