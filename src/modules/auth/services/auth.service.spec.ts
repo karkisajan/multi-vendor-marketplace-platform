@@ -16,13 +16,13 @@ import { VendorProfileRepository } from '../../users/repositories/vendor-profile
 import { JwtTokenService } from './jwt-token.service';
 import { User } from 'src/modules/users/entities/user.entity';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
-import { AUTH_EVENTS } from 'src/mail/events/auth-event-names';
+import { AUTH_EVENTS } from '../events/auth-event-names';
 import {
   CustomerForgetPasswordEvent,
   CustomerPasswordResetSuccessfulEvent,
   UserLoggedInEvent,
   UserRegistrationEvent,
-} from 'src/mail/events/auth.events';
+} from '../events/auth.events';
 import { RegisterCustomerDto } from 'src/modules/users/dto/auth/register-customer.dto';
 import { RegisterVendorDto } from 'src/modules/users/dto/auth/register-vendor.dto';
 
@@ -33,12 +33,13 @@ describe('AuthService', () => {
 
   const userRepository = {
     findUser: jest.fn(),
-    registerUser: jest.fn(),
+    registerUserAsEmail: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
   };
 
   const customerProfileRepository = {
-    createUserProfile: jest.fn(),
+    createCustomerProfile: jest.fn(),
   };
 
   const vendorProfileRepository = {
@@ -47,6 +48,9 @@ describe('AuthService', () => {
 
   const jwtTokenService = {
     jwtSignToken: jest.fn(),
+    verifyRefreshToken: jest.fn(),
+    verifyResetToken: jest.fn(),
+    generateAndSaveToken: jest.fn(),
   };
 
   const dataSource = {
@@ -158,18 +162,19 @@ describe('AuthService', () => {
   describe('registerCustomer', () => {
     it('should register a customer and emit CUSTOMER_REGISTERED when credentials are valid', async () => {
       userRepository.findUser.mockResolvedValue(null);
-      userRepository.registerUser.mockResolvedValue({
+      userRepository.registerUserAsEmail.mockResolvedValue({
         id: 'user-id',
         email: 'john.doe@example.com',
         role: UserRoleEnum.CUSTOMER,
       });
-      customerProfileRepository.createUserProfile.mockResolvedValue({
+      customerProfileRepository.createCustomerProfile.mockResolvedValue({
         id: 'profile-id',
         firstName: 'John',
         lastName: 'Doe',
         profileUrl: null,
         phoneNumber: '+9779812345678',
       });
+      (argon.hash as jest.Mock).mockResolvedValue('hashed-value');
 
       const result = await service.registerCustomer(
         registerCustomerDto,
@@ -189,7 +194,7 @@ describe('AuthService', () => {
           phoneNumber: '+9779812345678',
         },
       });
-      expect(userRepository.registerUser).toHaveBeenCalledWith(
+      expect(userRepository.registerUserAsEmail).toHaveBeenCalledWith(
         'john.doe@example.com',
         'hashed-value',
         expect.any(Object),
@@ -208,7 +213,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(
         new BadRequestException('Passwords does not match. Please try again.'),
       );
-      expect(userRepository.registerUser).not.toHaveBeenCalled();
+      expect(userRepository.registerUserAsEmail).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException when email already exists', async () => {
@@ -226,7 +231,7 @@ describe('AuthService', () => {
   describe('registerVendor', () => {
     it('should register a vendor and emit VENDOR_REGISTERED when credentials are valid', async () => {
       userRepository.findUser.mockResolvedValue(null);
-      userRepository.registerUser.mockResolvedValue({
+      userRepository.registerUserAsEmail.mockResolvedValue({
         id: 'vendor-id',
         email: 'vendor@example.com',
         role: UserRoleEnum.VENDOR,
@@ -237,6 +242,7 @@ describe('AuthService', () => {
         businessProfileUrl: 'https://example.com/business.jpg',
         phoneNumber: '+9779812345678',
       });
+      (argon.hash as jest.Mock).mockResolvedValue('hashed-value');
 
       const result = await service.registerVendor(
         registerVendorDto,
@@ -256,7 +262,7 @@ describe('AuthService', () => {
           phoneNumber: '+9779812345678',
         },
       });
-      expect(userRepository.registerUser).toHaveBeenCalledWith(
+      expect(userRepository.registerUserAsEmail).toHaveBeenCalledWith(
         'vendor@example.com',
         'hashed-value',
         expect.any(Object),
@@ -276,7 +282,7 @@ describe('AuthService', () => {
       ).rejects.toThrow(
         new BadRequestException('Passwords does not match. Please try again.'),
       );
-      expect(userRepository.registerUser).not.toHaveBeenCalled();
+      expect(userRepository.registerUserAsEmail).not.toHaveBeenCalled();
     });
 
     it('should throw ConflictException when email already exists', async () => {
@@ -293,6 +299,12 @@ describe('AuthService', () => {
   describe('loginUser', () => {
     it('should return tokens and customer profile when credentials are valid', async () => {
       userRepository.findUser.mockResolvedValue(customerUser);
+      (argon.verify as jest.Mock).mockResolvedValue(true);
+      jwtTokenService.jwtSignToken.mockResolvedValue({
+        message: 'User logged in successfully.',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+      });
 
       const result = await service.loginUser(
         {
@@ -331,6 +343,12 @@ describe('AuthService', () => {
 
     it('should return tokens and vendor profile when vendor credentials are valid', async () => {
       userRepository.findUser.mockResolvedValue(vendorUser);
+      (argon.verify as jest.Mock).mockResolvedValue(true);
+      jwtTokenService.jwtSignToken.mockResolvedValue({
+        message: 'User logged in successfully.',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+      });
 
       const result = await service.loginUser(
         {
@@ -346,7 +364,10 @@ describe('AuthService', () => {
         profileUrl: 'https://example.com/business.jpg',
         phoneNumber: '+9779812345678',
       });
-      expect(eventEmitter.emit).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).toHaveBeenCalledWith(
+        AUTH_EVENTS.VENDOR_LOGGED_IN,
+        expect.anything(),
+      );
     });
 
     it('should throw UnauthorizedException when user is not found', async () => {
@@ -389,7 +410,7 @@ describe('AuthService', () => {
     };
 
     beforeEach(() => {
-      jwtService.verify.mockReturnValue({
+      jwtTokenService.verifyRefreshToken.mockReturnValue({
         id: 'user-id',
         email: 'john.doe@example.com',
       });
@@ -397,12 +418,18 @@ describe('AuthService', () => {
 
     it('should return new tokens when refresh token is valid', async () => {
       userRepository.findUser.mockResolvedValue(userWithRefreshToken);
+      (argon.verify as jest.Mock).mockResolvedValue(true);
+      jwtTokenService.jwtSignToken.mockResolvedValue({
+        message: 'User logged in successfully.',
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+      });
 
       const result = await service.refreshToken(refreshTokenDto);
 
-      expect(jwtService.verify).toHaveBeenCalledWith('valid-refresh-token', {
-        secret: 'refresh-secret',
-      });
+      expect(jwtTokenService.verifyRefreshToken).toHaveBeenCalledWith(
+        'valid-refresh-token',
+      );
       expect(argon.verify).toHaveBeenCalledWith(
         'hashed-refresh-token',
         'valid-refresh-token',
@@ -423,7 +450,7 @@ describe('AuthService', () => {
       (argon.verify as jest.Mock).mockResolvedValue(false);
 
       await expect(service.refreshToken(refreshTokenDto)).rejects.toThrow(
-        'Invalid password. Please try again.',
+        'Invalid or expired refresh-token. Please try again.',
       );
     });
 
@@ -442,8 +469,7 @@ describe('AuthService', () => {
   describe('forgetPassword', () => {
     it('should generate reset token, save user, and emit CUSTOMER_FORGET_PASSWORD when email exists', async () => {
       userRepository.findUser.mockResolvedValue(customerUser);
-      jwtService.sign.mockReturnValue('reset-token');
-      userRepository.save.mockResolvedValue(customerUser);
+      jwtTokenService.generateAndSaveToken.mockResolvedValue('reset-token');
 
       const result = await service.forgetPassword(
         { email: 'john.doe@example.com' },
@@ -453,15 +479,14 @@ describe('AuthService', () => {
       expect(result).toEqual({
         message: 'Password reset link has been sent to your email.',
       });
-      expect(jwtService.sign).toHaveBeenCalledWith(
-        { id: 'user-id', email: 'john.doe@example.com' },
-        { secret: 'reset-secret', expiresIn: '15m' },
-      );
-      expect(userRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          resetPasswordToken: 'hashed-value',
-          resetPasswordTokenExpiryDate: expect.any(Date),
-        }),
+      expect(jwtTokenService.generateAndSaveToken).toHaveBeenCalledWith(
+        'user-id',
+        { id: 'user-id', email: 'john.doe@example.com', role: UserRoleEnum.CUSTOMER },
+        'reset-secret',
+        '7d',
+        'resetPasswordToken',
+        'resetPasswordTokenExpiryDate',
+        expect.any(Date),
       );
       expect(eventEmitter.emit).toHaveBeenCalledWith(
         AUTH_EVENTS.CUSTOMER_FORGET_PASSWORD,
@@ -495,7 +520,7 @@ describe('AuthService', () => {
     };
 
     beforeEach(() => {
-      jwtService.verify.mockReturnValue({
+      jwtTokenService.verifyResetToken.mockReturnValue({
         id: 'user-id',
         email: 'john.doe@example.com',
       });
@@ -504,6 +529,8 @@ describe('AuthService', () => {
     it('should update password, clear reset fields, and emit CUSTOMER_PASSWORD_RESET_SUCCESSFUL when token is valid', async () => {
       userRepository.findUser.mockResolvedValue(userWithResetToken);
       userRepository.save.mockResolvedValue(userWithResetToken);
+      (argon.verify as jest.Mock).mockResolvedValue(true);
+      (argon.hash as jest.Mock).mockResolvedValue('hashed-value');
 
       const result = await service.resetPassword(
         resetPasswordDto,
@@ -541,6 +568,7 @@ describe('AuthService', () => {
         resetPasswordToken: 'hashed-reset-token',
         resetPasswordTokenExpiryDate: new Date(Date.now() - 60_000),
       });
+      (argon.verify as jest.Mock).mockResolvedValue(true);
 
       await expect(
         service.resetPassword(resetPasswordDto, userIpAddress),
