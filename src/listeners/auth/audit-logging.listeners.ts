@@ -49,7 +49,7 @@ export class AuditLoggingListener {
     }
   }
 
-  @OnEvent(AUTH_EVENTS.CUSTOMER_LOGGED_IN)
+  @OnEvent(AUTH_EVENTS.VENDOR_LOGGED_IN)
   async handleVendorLoggedIn(event: VendorLoggedInEvent) {
     try {
       await this.auditLogRepository.createAuditLog(

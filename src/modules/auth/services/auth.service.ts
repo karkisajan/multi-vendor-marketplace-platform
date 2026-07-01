@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { UserRepository } from '../../users/repositories/user.repository';
@@ -31,6 +32,11 @@ import {
   UserRegistrationEvent,
   VendorLoggedInEvent,
 } from '../events/auth.events';
+import { GoogleUser } from '../strategies/google-auth.strategy';
+import { UserStatusEnum } from 'src/common/enums/user-status.enum';
+import { AuthProviderTypeEnum } from 'src/common/enums/auth-providerType.enum';
+import * as crypto from 'crypto';
+import { FacebookUser } from '../strategies/facebook-auth.strategy';
 
 interface JwtPayload {
   id: string;
@@ -40,6 +46,7 @@ interface JwtPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   constructor(
     private readonly userRepository: UserRepository,
     private readonly customerProfileRepository: CustomerProfileRepository,
@@ -78,7 +85,7 @@ export class AuthService {
   /**
    * Issues JWT tokens via JwtTokenService and shapes the login/refresh response with role-specific profile data.
    */
-  private async jwtTokenResponse(user: User, role: UserRoleEnum) {
+  private async buildJwtTokenResponse(user: User, role: UserRoleEnum) {
     const jwtTokenRes = await this.jwtTokenService.jwtSignToken(
       user.id,
       user.email,
@@ -171,6 +178,9 @@ export class AuthService {
       ),
     );
 
+    this.logger.log(
+      `New customer account registered successfully. Id: ${result.id} email: ${result.email}`,
+    );
     return result;
   }
 
@@ -236,6 +246,9 @@ export class AuthService {
       ),
     );
 
+    this.logger.log(
+      `New vendor account registered successfully. Id: ${result.id} email: ${result.email}`,
+    );
     return result;
   }
 
@@ -282,7 +295,10 @@ export class AuthService {
       );
     }
 
-    return await this.jwtTokenResponse(user, user.role);
+    this.logger.log(
+      `User logged in successfully. Id: ${user.id}, email: ${user.email}, role: ${user.role}`,
+    );
+    return await this.buildJwtTokenResponse(user, user.role);
   }
 
   /**
@@ -319,7 +335,7 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token has expired.');
     }
 
-    return await this.jwtTokenResponse(user, user.role);
+    return await this.buildJwtTokenResponse(user, user.role);
   }
 
   /**
@@ -368,6 +384,9 @@ export class AuthService {
       );
     }
 
+    this.logger.log(
+      `Forget password request from user - Id: ${user.id}, email ${user.email}`,
+    );
     return {
       message: 'Password reset link has been sent to your email.',
     };
@@ -438,8 +457,229 @@ export class AuthService {
       );
     }
 
+    this.logger.log(
+      `Password reset successful from user - Id: ${user.id}, email ${user.email}`,
+    );
     return {
       message: 'Your password has been successfully reset',
     };
+  }
+
+  /**
+   * ------ GET - Google OAuth login / auto-registration
+   * Authenticates a user who has completed the Google OAuth consent flow.
+   *
+   * Flow:
+   * 1. Validates the GoogleUser profile forwarded by Passport (email is mandatory).
+   * 2. Looks up an existing account by the normalised email address.
+   *    - **New user**: opens a database transaction, creates a User record with a random
+   *      crypto password (account is not password-loginable), creates a CustomerProfile
+   *      from the Google display name and avatar, and emits CUSTOMER_REGISTERED.
+   *    - **Existing user**: back-fills `authProviderType` / `authProviderId` if they are
+   *      missing, and syncs the Google avatar if the profile has no picture yet.
+   * 3. Emits CUSTOMER_LOGGED_IN for audit/notification purposes.
+   * 4. Issues and returns a signed JWT access token + refresh token pair via
+   *    `buildJwtTokenResponse`.
+   *
+   * @param googleUser - Normalised profile extracted by `GoogleAuthStrategy.validate`
+   * @param ipAddress  - Client IP address captured by the `GetIpAddress` decorator
+   * @throws BadRequestException when the Google profile is missing or has no email
+   */
+  async googleLogin(googleUser: GoogleUser, ipAddress: string) {
+    if (!googleUser || !googleUser.email) {
+      throw new BadRequestException(
+        'Invalid google authentication credentials. Please try again.',
+      );
+    }
+
+    let user: User | null = await this.userRepository.findUser(
+      normalizedEmail(googleUser.email),
+    );
+    if (!user) {
+      user = await this.dataSource.manager.transaction(
+        async (manager: EntityManager) => {
+          const randomCryptoPassword: string = crypto
+            .randomBytes(32)
+            .toString('hex');
+          const hashedPassword: string = await argon.hash(randomCryptoPassword);
+
+          const customer = manager.create(User, {
+            email: normalizedEmail(googleUser.email),
+            password: hashedPassword,
+            status: UserStatusEnum.ACTIVE,
+            role: UserRoleEnum.CUSTOMER,
+            authProviderType: AuthProviderTypeEnum.GOOGLE,
+            authProviderId: googleUser.providerId,
+          });
+          const savedCustomer: User | null =
+            await this.userRepository.save(customer);
+
+          const fullGoogleUserName: string[] = googleUser.name
+            .trim()
+            .split(' ');
+          const firstName: string = fullGoogleUserName[0];
+          const lastName: string = fullGoogleUserName.slice(1).join('');
+
+          const customerProfile = this.customerProfileRepository.create({
+            firstName: firstName,
+            lastName: lastName,
+            profileUrl: googleUser.avatar,
+            userId: savedCustomer.id,
+          });
+          const savedCustomerProfile: CustomerProfile =
+            await this.customerProfileRepository.save(customerProfile);
+          savedCustomer.customerProfile = savedCustomerProfile;
+
+          return savedCustomer;
+        },
+      );
+
+      this.eventEmitter.emit(
+        AUTH_EVENTS.CUSTOMER_REGISTERED,
+        new UserRegistrationEvent(
+          user.id,
+          user.email,
+          `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+          ipAddress,
+        ),
+      );
+    } else {
+      let isUpdated: boolean = false;
+      if (
+        user.authProviderType !== AuthProviderTypeEnum.GOOGLE ||
+        !user.authProviderId
+      ) {
+        user.authProviderType = AuthProviderTypeEnum.GOOGLE;
+        user.authProviderId = googleUser.providerId;
+        isUpdated = true;
+      }
+
+      if (
+        googleUser.avatar &&
+        user.customerProfile &&
+        !user.customerProfile.profileUrl
+      ) {
+        user.customerProfile.profileUrl = googleUser.avatar;
+        await this.customerProfileRepository.save(user.customerProfile);
+      }
+
+      if (isUpdated) {
+        await this.userRepository.save(user);
+      }
+    }
+
+    this.eventEmitter.emit(
+      AUTH_EVENTS.CUSTOMER_LOGGED_IN,
+      new UserLoggedInEvent(
+        user.id,
+        user.email,
+        `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+        ipAddress,
+      ),
+    );
+
+    return this.buildJwtTokenResponse(user, user.role);
+  }
+
+  /**
+   * ------ GET - Facebook OAuth login / auto-registration
+   * Authenticates a user who has completed the Facebook OAuth login flow.
+   *
+   */
+  async facebookLogin(facebookUser: FacebookUser, ipAddress: string) {
+    if (!facebookUser || !facebookUser.email) {
+      throw new BadRequestException('Invalid Facebook user profile.');
+    }
+
+    const email = normalizedEmail(facebookUser.email);
+
+    let user = await this.userRepository.findUser(email);
+
+    if (!user) {
+      user = await this.dataSource.manager.transaction(
+        async (manager: EntityManager) => {
+          const existingUser = await manager.findOne(User, {
+            where: { email },
+            relations: ['userProfile'],
+          });
+          if (existingUser) {
+            return existingUser;
+          }
+
+          const randomPassword = crypto.randomBytes(32).toString('hex');
+          const hashedPassword = await argon.hash(randomPassword);
+
+          const newUser = manager.create(User, {
+            email,
+            password: hashedPassword,
+            authProviderType: AuthProviderTypeEnum.FACEBOOK,
+            authProviderId: facebookUser.providerId,
+            userStatus: UserStatusEnum.ACTIVE,
+          });
+          const savedUser = await manager.save(User, newUser);
+
+          const fullFacebookUser: string[] = facebookUser.name
+            .trim()
+            .split(' ');
+          const firstName: string = fullFacebookUser[0];
+          const lastName: string = fullFacebookUser.slice(1).join('');
+
+          const userProfile = manager.create(CustomerProfile, {
+            firstName,
+            lastName,
+            profileUrl: facebookUser.avatar || undefined,
+            userId: savedUser.id,
+          });
+          await manager.save(CustomerProfile, userProfile);
+
+          savedUser.customerProfile = userProfile;
+          return savedUser;
+        },
+      );
+
+      this.eventEmitter.emit(
+        AUTH_EVENTS.CUSTOMER_REGISTERED,
+        new UserRegistrationEvent(
+          user.id,
+          user.email,
+          `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
+          ipAddress,
+        ),
+      );
+    } else {
+      let updated = false;
+      if (user.authProviderType !== AuthProviderTypeEnum.FACEBOOK) {
+        user.authProviderType = AuthProviderTypeEnum.FACEBOOK;
+        user.authProviderId = facebookUser.providerId;
+        updated = true;
+      } else if (!user.authProviderId) {
+        user.authProviderId = facebookUser.providerId;
+        updated = true;
+      }
+
+      if (
+        facebookUser.avatar &&
+        user.customerProfile &&
+        !user.customerProfile.profileUrl
+      ) {
+        user.customerProfile.profileUrl = facebookUser.avatar;
+        await this.customerProfileRepository.save(user.customerProfile);
+      }
+
+      if (updated) {
+        await this.userRepository.save(user);
+      }
+    }
+
+    const fullName = user.customerProfile
+      ? `${user.customerProfile.firstName} ${user.customerProfile.lastName}`
+      : 'Facebook User';
+
+    this.eventEmitter.emit(
+      AUTH_EVENTS.CUSTOMER_LOGGED_IN,
+      new UserLoggedInEvent(user.id, user.email, fullName, ipAddress),
+    );
+
+    return this.buildJwtTokenResponse(user, user.role);
   }
 }

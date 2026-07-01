@@ -13,6 +13,8 @@ import { VendorProfileRepository } from '../users/repositories/vendor-profile.re
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { MailModule } from 'src/infrastructure/mail/mail.module';
 import { MailService } from 'src/infrastructure/mail/mail.service';
+import { OpenAuthenticationController } from './controllers/open-authentication.controller';
+import { GoogleAuthStrategy } from './strategies/google-auth.strategy';
 
 @Module({
   imports: [
@@ -21,7 +23,7 @@ import { MailService } from 'src/infrastructure/mail/mail.service';
     MailModule,
     AuditLogsModule,
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, OpenAuthenticationController],
   providers: [
     AuthService,
     UserRepository,
@@ -29,6 +31,7 @@ import { MailService } from 'src/infrastructure/mail/mail.service';
     VendorProfileRepository,
     JwtTokenService,
     MailService,
+    GoogleAuthStrategy,
   ],
 })
 export class AuthModule {}
