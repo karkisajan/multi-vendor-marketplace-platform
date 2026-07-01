@@ -77,13 +77,11 @@ export class UserService {
    * user's role so that customers and vendors each update only the
    * fields relevant to their profile type.
    *
-   * @returns The refreshed user details after the update.
    */
   async updateUserProfile(
     user: CurrentUserContext,
     updateDto: UpdateCustomerDto | UpdateVendorDto,
   ) {
-    /* Verify the user still exists before attempting any mutation */
     const existingUser = await this.userRepository.findUserById(user.id);
     if (!existingUser) {
       throw new NotFoundException(
@@ -114,7 +112,6 @@ export class UserService {
    * timestamp rather than physically removing the row.  This preserves
    * order history, audit logs, and allows potential account recovery.
    *
-   * @returns A confirmation message upon successful deletion.
    */
   async deleteUser(user: CurrentUserContext) {
     const existingUser = await this.userRepository.findUserById(user.id);
