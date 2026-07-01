@@ -33,7 +33,6 @@ import {
   VendorLoggedInEvent,
 } from '../events/auth.events';
 import { GoogleUser } from '../strategies/google-auth.strategy';
-import { UserStatusEnum } from 'src/common/enums/user-status.enum';
 import { AuthProviderTypeEnum } from 'src/common/enums/auth-providerType.enum';
 import * as crypto from 'crypto';
 import { FacebookUser } from '../strategies/facebook-auth.strategy';
@@ -118,6 +117,15 @@ export class AuthService {
   }
 
   /**
+   * ---- Reusable password hashing function (argon.js)
+   */
+  private async hashPassword(): Promise<string> {
+    const randomPassword: string = crypto.randomBytes(32).toString('hex');
+    const hashedPassword: string = await argon.hash(randomPassword);
+    return hashedPassword;
+  }
+
+  /**
    * ------ POST - Register user (Customer)
    * Registers a new customer account and creates a customer profile within a single database transaction.
    * Emits a CUSTOMER_REGISTERED event after successful persistence.
@@ -138,14 +146,14 @@ export class AuthService {
           registerCustomerDto.password,
         );
 
-        const savedUser: User = await this.userRepository.registerUser(
+        const savedUser: User = await this.userRepository.registerUserAsEmail(
           normalizedEmail(registerCustomerDto.email),
           hashedPassword,
           manager,
         );
 
         const savedUserProfile: CustomerProfile =
-          await this.customerProfileRepository.createUserProfile(
+          await this.customerProfileRepository.createCustomerProfile(
             registerCustomerDto,
             savedUser.id,
             manager,
@@ -205,7 +213,7 @@ export class AuthService {
           registerVendorDto.password,
         );
 
-        const savedVendor: User = await this.userRepository.registerUser(
+        const savedVendor: User = await this.userRepository.registerUserAsEmail(
           normalizedEmail(registerVendorDto.email),
           hashedPassword,
           manager,
@@ -469,21 +477,6 @@ export class AuthService {
    * ------ GET - Google OAuth login / auto-registration
    * Authenticates a user who has completed the Google OAuth consent flow.
    *
-   * Flow:
-   * 1. Validates the GoogleUser profile forwarded by Passport (email is mandatory).
-   * 2. Looks up an existing account by the normalised email address.
-   *    - **New user**: opens a database transaction, creates a User record with a random
-   *      crypto password (account is not password-loginable), creates a CustomerProfile
-   *      from the Google display name and avatar, and emits CUSTOMER_REGISTERED.
-   *    - **Existing user**: back-fills `authProviderType` / `authProviderId` if they are
-   *      missing, and syncs the Google avatar if the profile has no picture yet.
-   * 3. Emits CUSTOMER_LOGGED_IN for audit/notification purposes.
-   * 4. Issues and returns a signed JWT access token + refresh token pair via
-   *    `buildJwtTokenResponse`.
-   *
-   * @param googleUser - Normalised profile extracted by `GoogleAuthStrategy.validate`
-   * @param ipAddress  - Client IP address captured by the `GetIpAddress` decorator
-   * @throws BadRequestException when the Google profile is missing or has no email
    */
   async googleLogin(googleUser: GoogleUser, ipAddress: string) {
     if (!googleUser || !googleUser.email) {
@@ -498,21 +491,15 @@ export class AuthService {
     if (!user) {
       user = await this.dataSource.manager.transaction(
         async (manager: EntityManager) => {
-          const randomCryptoPassword: string = crypto
-            .randomBytes(32)
-            .toString('hex');
-          const hashedPassword: string = await argon.hash(randomCryptoPassword);
-
-          const customer = manager.create(User, {
-            email: normalizedEmail(googleUser.email),
-            password: hashedPassword,
-            status: UserStatusEnum.ACTIVE,
-            role: UserRoleEnum.CUSTOMER,
-            authProviderType: AuthProviderTypeEnum.GOOGLE,
-            authProviderId: googleUser.providerId,
-          });
-          const savedCustomer: User | null =
-            await this.userRepository.save(customer);
+          const hashedPassword: string = await this.hashPassword();
+          const savedUser: User =
+            await this.userRepository.registerUserAsSocialAuth(
+              manager,
+              normalizedEmail(googleUser.email),
+              hashedPassword,
+              AuthProviderTypeEnum.GOOGLE,
+              googleUser.providerId,
+            );
 
           const fullGoogleUserName: string[] = googleUser.name
             .trim()
@@ -520,17 +507,17 @@ export class AuthService {
           const firstName: string = fullGoogleUserName[0];
           const lastName: string = fullGoogleUserName.slice(1).join('');
 
-          const customerProfile = this.customerProfileRepository.create({
-            firstName: firstName,
-            lastName: lastName,
-            profileUrl: googleUser.avatar,
-            userId: savedCustomer.id,
-          });
-          const savedCustomerProfile: CustomerProfile =
-            await this.customerProfileRepository.save(customerProfile);
-          savedCustomer.customerProfile = savedCustomerProfile;
+          const savedCustomerProfile =
+            await this.customerProfileRepository.createSocialAuthCustomerProfile(
+              firstName,
+              lastName,
+              googleUser.avatar,
+              savedUser.id,
+              manager,
+            );
+          savedUser.customerProfile = savedCustomerProfile;
 
-          return savedCustomer;
+          return savedUser;
         },
       );
 
@@ -568,14 +555,13 @@ export class AuthService {
       }
     }
 
+    const fullName: string = user.customerProfile
+      ? `${user.customerProfile.firstName} ${user.customerProfile.lastName}`
+      : 'Google User';
+
     this.eventEmitter.emit(
       AUTH_EVENTS.CUSTOMER_LOGGED_IN,
-      new UserLoggedInEvent(
-        user.id,
-        user.email,
-        `${user.customerProfile.firstName} ${user.customerProfile.lastName}`,
-        ipAddress,
-      ),
+      new UserLoggedInEvent(user.id, user.email, fullName, ipAddress),
     );
 
     return this.buildJwtTokenResponse(user, user.role);
@@ -591,48 +577,39 @@ export class AuthService {
       throw new BadRequestException('Invalid Facebook user profile.');
     }
 
-    const email = normalizedEmail(facebookUser.email);
-
-    let user = await this.userRepository.findUser(email);
+    let user: User | null = await this.userRepository.findUser(
+      normalizedEmail(facebookUser.email),
+    );
 
     if (!user) {
       user = await this.dataSource.manager.transaction(
         async (manager: EntityManager) => {
-          const existingUser = await manager.findOne(User, {
-            where: { email },
-            relations: ['userProfile'],
-          });
-          if (existingUser) {
-            return existingUser;
-          }
+          const hashedPassword: string = await this.hashPassword();
+          const savedUser: User =
+            await this.userRepository.registerUserAsSocialAuth(
+              manager,
+              normalizedEmail(facebookUser.email),
+              hashedPassword,
+              AuthProviderTypeEnum.FACEBOOK,
+              facebookUser.providerId,
+            );
 
-          const randomPassword = crypto.randomBytes(32).toString('hex');
-          const hashedPassword = await argon.hash(randomPassword);
-
-          const newUser = manager.create(User, {
-            email,
-            password: hashedPassword,
-            authProviderType: AuthProviderTypeEnum.FACEBOOK,
-            authProviderId: facebookUser.providerId,
-            userStatus: UserStatusEnum.ACTIVE,
-          });
-          const savedUser = await manager.save(User, newUser);
-
-          const fullFacebookUser: string[] = facebookUser.name
+          const fullFacebookUserName: string[] = facebookUser.name
             .trim()
             .split(' ');
-          const firstName: string = fullFacebookUser[0];
-          const lastName: string = fullFacebookUser.slice(1).join('');
+          const firstName: string = fullFacebookUserName[0];
+          const lastName: string = fullFacebookUserName.slice(1).join('');
 
-          const userProfile = manager.create(CustomerProfile, {
-            firstName,
-            lastName,
-            profileUrl: facebookUser.avatar || undefined,
-            userId: savedUser.id,
-          });
-          await manager.save(CustomerProfile, userProfile);
+          const savedCustomerProfile: CustomerProfile =
+            await this.customerProfileRepository.createSocialAuthCustomerProfile(
+              firstName,
+              lastName,
+              facebookUser.avatar,
+              savedUser.id,
+              manager,
+            );
 
-          savedUser.customerProfile = userProfile;
+          savedUser.customerProfile = savedCustomerProfile;
           return savedUser;
         },
       );

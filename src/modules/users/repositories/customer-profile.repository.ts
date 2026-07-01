@@ -11,19 +11,19 @@ export class CustomerProfileRepository extends Repository<CustomerProfile> {
   }
 
   /* POST - user profile */
-  async createUserProfile(
+  async createCustomerProfile(
     registerUserDto: RegisterCustomerDto,
     userId: string,
     manager: EntityManager,
-  ) {
-    const userProfile = manager.create(CustomerProfile, {
+  ): Promise<CustomerProfile> {
+    const customerProfile = manager.create(CustomerProfile, {
       firstName: registerUserDto.firstName,
       lastName: registerUserDto.lastName,
       phoneNumber: registerUserDto.phoneNumber,
       userId: userId,
     });
 
-    return await manager.save(CustomerProfile, userProfile);
+    return await manager.save(CustomerProfile, customerProfile);
   }
 
   /* PUT - update customer profile */
@@ -32,5 +32,22 @@ export class CustomerProfileRepository extends Repository<CustomerProfile> {
     updateCustomerDto: UpdateCustomerDto,
   ): Promise<void> {
     await this.update({ userId }, updateCustomerDto);
+  }
+
+  /* POST - cerate customer google user profile */
+  async createSocialAuthCustomerProfile(
+    firstName: string,
+    lastName: string,
+    profileUrl: string,
+    userId: string,
+    manager: EntityManager,
+  ): Promise<CustomerProfile> {
+    const userProfile = manager.create(CustomerProfile, {
+      firstName: firstName,
+      lastName: lastName,
+      profileUrl: profileUrl,
+      userId: userId,
+    });
+    return await manager.save(CustomerProfile, userProfile);
   }
 }

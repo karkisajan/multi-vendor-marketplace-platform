@@ -12,12 +12,12 @@ export class UserRepository extends Repository<User> {
   }
 
   /* POST - register user */
-  async registerUser(
+  async registerUserAsEmail(
     normalizedEmail: string,
     hashedPassword: string,
     manager: EntityManager,
     role: UserRoleEnum = UserRoleEnum.CUSTOMER,
-  ) {
+  ): Promise<User> {
     const user = manager.create(User, {
       email: normalizedEmail,
       password: hashedPassword,
@@ -27,6 +27,26 @@ export class UserRepository extends Repository<User> {
     });
 
     return await manager.save(User, user);
+  }
+
+  /* POST - create user */
+  async registerUserAsSocialAuth(
+    manager: EntityManager,
+    normalizedEmail: string,
+    hashedPassword: string,
+    authProviderType: AuthProviderTypeEnum,
+    authProviderId: string,
+  ): Promise<User> {
+    const user = manager.create(User, {
+      email: normalizedEmail,
+      password: hashedPassword,
+      status: UserStatusEnum.ACTIVE,
+      role: UserRoleEnum.CUSTOMER,
+      authProviderType: authProviderType,
+      authProviderId: authProviderId,
+    });
+
+    return manager.save(User, user);
   }
 
   /* GET - user by email */
