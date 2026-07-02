@@ -72,9 +72,7 @@ export class CategoryService {
     for (const firstLevelCategory of firstLevelCategories) {
       /* 2nd Level: Direct sub-categories */
       const secondLevelCategories: Category[] =
-        await this.categoryRepository.find(
-          findOptions(firstLevelCategory.parentId),
-        );
+        await this.categoryRepository.find(findOptions(firstLevelCategory.id));
 
       const secondLevelCategoriesResult: Array<
         Category & { children: Category[] }
