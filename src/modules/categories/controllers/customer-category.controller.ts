@@ -31,6 +31,6 @@ export class CustomerCategoryController {
   @ApiGetCategoryTree()
   @Get('/category-tree')
   async getCategoryTree() {
-    return await this.categoryService.getCategoryTree();
+    return await this.categoryService.getCategoryTreeCustomer();
   }
 }

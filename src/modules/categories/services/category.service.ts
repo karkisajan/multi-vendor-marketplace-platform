@@ -42,6 +42,66 @@ export class CategoryService {
   }
 
   /**
+   * Recursively builds a 3-level deep nested category tree structure.
+   * Leverages sequential database queries to populate parent-child relationships up to three levels.
+   */
+  private async buildCategoryTree(options: {
+    select?: (keyof Category)[];
+    isPublished?: boolean;
+  }): Promise<
+    Array<Category & { children: Array<Category & { children: Category[] }> }>
+  > {
+    const { select, isPublished } = options;
+
+    const findOptions = (parentId: string | null) => ({
+      where: {
+        parentId: parentId === null ? IsNull() : parentId,
+        ...(isPublished ? { status: StatusTypeEnum.PUBLISHED } : {}),
+      },
+      ...(select ? { select: select } : {}),
+    });
+
+    /* 1st Level: Top-level parent categories */
+    const firstLevelCategories: Category[] = await this.categoryRepository.find(
+      findOptions(null),
+    );
+
+    const result: Array<
+      Category & { children: Array<Category & { children: Category[] }> }
+    > = [];
+    for (const firstLevelCategory of firstLevelCategories) {
+      /* 2nd Level: Direct sub-categories */
+      const secondLevelCategories: Category[] =
+        await this.categoryRepository.find(
+          findOptions(firstLevelCategory.parentId),
+        );
+
+      const secondLevelCategoriesResult: Array<
+        Category & { children: Category[] }
+      > = [];
+      for (const secondLevelCategory of secondLevelCategories) {
+        /* 3rd Level: Leaf sub-categories */
+        const thirdLevelCategories: Category[] =
+          await this.categoryRepository.find(
+            findOptions(secondLevelCategory.id),
+          );
+
+        secondLevelCategoriesResult.push({
+          ...secondLevelCategory,
+          children: thirdLevelCategories,
+        });
+      }
+
+      result.push({
+        ...firstLevelCategory,
+        children: secondLevelCategoriesResult,
+      });
+    }
+
+    return result;
+  }
+
+  /**
    * Helper method to map filtering criteria (status, isActive, search query)
    * to a TypeORM FindOptionsWhere conditions object.
    */
@@ -68,6 +128,36 @@ export class CategoryService {
   }
 
   /* =============== Customer specific services */
+  /**
+   * Retrieves a filtered category tree for customers, containing only published categories
+   * and selecting a subset of fields (id, name, slug, imageUrl). Uses version-based cache keys.
+   */
+  async getCategoryTreeCustomer(): Promise<
+    Array<Category & { children: Array<Category & { children: Category[] }> }>
+  > {
+    const version: string = await this.getCachedCategoryVersion();
+    const cacheKey: string = `categories:v${version}:tree`;
+    const cachedData =
+      await this.cacheManager.get<
+        Array<
+          Category & { children: Array<Category & { children: Category[] }> }
+        >
+      >(cacheKey);
+    if (cachedData) {
+      return cachedData;
+    }
+
+    const result: Array<
+      Category & { children: Array<Category & { children: Category[] }> }
+    > = await this.buildCategoryTree({
+      isPublished: true,
+      select: ['id', 'name', 'slug', 'imageUrl'],
+    });
+
+    await this.cacheManager.set(cacheKey, result, 10 * 1000);
+    return result;
+  }
+
   /**
    * ------ GET - parent-categories
    * Retrieves a paginated list of all top-level parent categories (where parentId is null).
@@ -179,12 +269,10 @@ export class CategoryService {
   }
 
   /**
-   * ------ GET - category-tree
-   * Builds and returns a 3-level deep hierarchical category tree.
-   * Queries parent categories first, then fetches their child and grandchild relationships iteratively.
-   * @returns Hierarchical nested category tree list with child subcategories
+   * Retrieves the complete category tree for admin use (includes unpublished categories).
+   * Utilizes version-based cache key verification to serve cached responses when available.
    */
-  async getCategoryTree(): Promise<
+  async getCategoryTreeAdmin(): Promise<
     Array<Category & { children: Array<Category & { children: Category[] }> }>
   > {
     const version: string = await this.getCachedCategoryVersion();
@@ -199,49 +287,9 @@ export class CategoryService {
       return cachedData;
     }
 
-    /* GET first level parent-categories */
-    const firstLevelCategories: Category[] = await this.categoryRepository.find(
-      {
-        where: {
-          parentId: IsNull(),
-        },
-        select: ['id', 'name', 'slug', 'imageUrl'],
-      },
-    );
-
     const result: Array<
       Category & { children: Array<Category & { children: Category[] }> }
-    > = [];
-    for (const firstLevelCategory of firstLevelCategories) {
-      const secondLevelCategories = await this.categoryRepository.find({
-        where: {
-          parentId: firstLevelCategory.id,
-        },
-        select: ['id', 'name', 'slug', 'imageUrl'],
-      });
-
-      const secondLevelCategoriesResult: Array<
-        Category & { children: Category[] }
-      > = [];
-      for (const secondLevelCategory of secondLevelCategories) {
-        const thirdLevelCategories = await this.categoryRepository.find({
-          where: {
-            parentId: secondLevelCategory.id,
-          },
-          select: ['id', 'name', 'slug', 'imageUrl'],
-        });
-
-        secondLevelCategoriesResult.push({
-          ...secondLevelCategory,
-          children: thirdLevelCategories,
-        });
-      }
-
-      result.push({
-        ...firstLevelCategory,
-        children: secondLevelCategoriesResult,
-      });
-    }
+    > = await this.buildCategoryTree({ isPublished: false });
 
     await this.cacheManager.set(cacheKey, result, 10 * 1000);
     return result;

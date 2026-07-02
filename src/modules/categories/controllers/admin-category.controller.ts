@@ -55,7 +55,7 @@ export class AdminCategoryController {
   @ApiGetCategoryTree()
   @Get('/category-tree')
   async getCategoryTree() {
-    return this.categoryService.getCategoryTree();
+    return this.categoryService.getCategoryTreeAdmin();
   }
 
   /**
