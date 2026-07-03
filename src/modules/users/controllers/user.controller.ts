@@ -29,7 +29,6 @@ export class UserController {
   @Get('/user-details')
   @ApiGetUserDetails()
   async getUserDetails(@GetCurrentUser() user: CurrentUserContext) {
-    console.log('This is the user data', user);
     return await this.userService.getUserDetails(user);
   }
 

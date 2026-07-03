@@ -69,4 +69,16 @@ export class AdminUpdateProductDto {
   @IsOptional()
   @IsEnum(ProductStatusEnum, { message: 'Invalid product status.' })
   status?: ProductStatusEnum;
+
+  @ApiProperty({
+    example: 'Product description does not meet quality standards.',
+    description: 'Optional review note from admin',
+    required: false,
+  })
+  @IsOptional()
+  @MaxLength(500, {
+    message: 'Review note should not exceed 500 characters.',
+  })
+  @IsString({ message: 'Review note must be a string.' })
+  flagReason?: string;
 }

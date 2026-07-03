@@ -16,6 +16,8 @@ import { ProductVariant } from '../entities/product-variant.entity';
 import { generateSlug } from 'src/common/utils/generate-slug.util';
 import { CategoryRepository } from 'src/modules/categories/repositories/category.repository';
 import { Category } from 'src/modules/categories/entities/category.entity';
+import { CurrentUserContext } from 'src/modules/users/types/user.types';
+import { normalizePagination } from 'src/common/utils/validate-pagination.util';
 
 @Injectable()
 export class ProductService {
@@ -277,7 +279,77 @@ export class ProductService {
     };
   }
 
-  /* ------ Admin specific services */
+  async getAllProductsAdmin({ page, limit }: { page: number; limit: number }) {
+    const {
+      normalizedPage,
+      normalizedLimit,
+    }: { normalizedPage: number; normalizedLimit: number } =
+      normalizePagination(page, limit);
+
+    const baseQuery = this.productRepository
+      .createQueryBuilder('product')
+      .select([
+        'product.id',
+        'product.name',
+        'product.description',
+        'product.createdAt',
+        'vendor.id',
+        'vendorProfile.id',
+        'vendorProfile.businessName',
+        'vendorProfile.businessProfileUrl',
+        'category.id',
+        'category.name',
+      ])
+      .leftJoin('product.category', 'category')
+      .leftJoin('product.user', 'vendor')
+      .leftJoin('vendor.vendorProfile', 'vendorProfile')
+      .skip((normalizedPage - 1) * normalizedLimit)
+      .take(normalizedLimit)
+      .orderBy('product.createdAt', 'DESC');
+
+    const [allProducts, totalProducts]: [Product[], number] =
+      await baseQuery.getManyAndCount();
+
+    const mappedProductsDataResponse = allProducts.map((product) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      status: product.status,
+      category: {
+        id: product.category.id,
+        name: product.category.name,
+      },
+      vendorProfile: {
+        id: product.user.vendorProfile.id,
+        businessName: product.user.vendorProfile.businessName,
+        businessProfileUrl: product.user.vendorProfile.businessProfileUrl,
+      },
+    }));
+
+    const result =
+      mappedProductsDataResponse.length === 0
+        ? {
+            data: [],
+            meta: {
+              page: normalizedPage,
+              limit: normalizedLimit,
+              total: 0,
+              totalPages: 0,
+            },
+          }
+        : {
+            data: mappedProductsDataResponse,
+            meta: {
+              page: page,
+              limit: normalizedLimit,
+              total: totalProducts,
+              totalPages: Math.ceil(totalProducts / normalizedLimit),
+            },
+          };
+
+    return result;
+  }
+
   /**
    * ------ PUT - Update product status (Admin)
    * Transitions a product through lifecycle states: publish, reject, or archive.
@@ -286,6 +358,7 @@ export class ProductService {
   async adminUpdateProductStatus(
     productId: string,
     updateProductStatusDto: UpdateProductStatusDto,
+    user: CurrentUserContext,
   ) {
     const product: Product | null =
       await this.productRepository.findProductById(productId);
@@ -296,6 +369,8 @@ export class ProductService {
     const updatedProduct: Product | null =
       await this.productRepository.updateProduct(productId, {
         status: updateProductStatusDto.status,
+        flagReason: updateProductStatusDto.flagReason,
+        flaggedBy: user.id,
       });
     if (!updatedProduct) {
       throw new NotFoundException('Product not found after update.');
@@ -306,7 +381,7 @@ export class ProductService {
       id: updatedProduct.id,
       name: updatedProduct.name,
       status: updatedProduct.status,
-      reviewNote: updateProductStatusDto.reviewNote ?? null,
+      flagReason: updateProductStatusDto.flagReason ?? null,
     };
   }
 
@@ -319,6 +394,7 @@ export class ProductService {
   async adminUpdateProduct(
     productId: string,
     adminUpdateProductDto: AdminUpdateProductDto,
+    user: CurrentUserContext,
   ) {
     const product: Product | null =
       await this.productRepository.findProductById(productId);
@@ -363,6 +439,11 @@ export class ProductService {
       updateData.status = adminUpdateProductDto.status;
     }
 
+    if (user && adminUpdateProductDto.flagReason !== undefined) {
+      updateData.flagReason = adminUpdateProductDto.flagReason;
+      updateData.flaggedBy = user.id;
+    }
+
     const updatedProduct: Product | null =
       await this.productRepository.updateProduct(productId, updateData);
     if (!updatedProduct) {
@@ -377,26 +458,6 @@ export class ProductService {
       description: updatedProduct.description,
       categoryId: updatedProduct.categoryId,
       status: updatedProduct.status,
-    };
-  }
-
-  /**
-   * ------ DELETE - Hard delete product (Admin)
-   * Permanently removes a product and all its associated variants from the database.
-   * Unlike vendor deletion, admin deletion works on any product regardless of status.
-   */
-  async adminDeleteProduct(productId: string) {
-    const product: Product | null =
-      await this.productRepository.findProductById(productId);
-    if (!product) {
-      throw new NotFoundException('Product not found.');
-    }
-
-    await this.productRepository.delete(productId);
-
-    return {
-      id: productId,
-      message: 'Product deleted successfully.',
     };
   }
 }

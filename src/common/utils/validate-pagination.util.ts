@@ -1,26 +1,24 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 
-export const validatePagination = (page: number, limit: number): void => {
-  if (isNaN(Number(page)) || isNaN(Number(limit)) || page <= 0 || limit <= 0) {
-    throw new ConflictException(
-      'Page and limit should be of positive integers.',
-    );
-  }
-};
+const MAX_LIMIT: number = 100;
 
-export const validatePaginationLimit = (limit: number): number => {
-  const MAX_ITEMS_PER_PAGE: number = 20;
-  const newLimit: number =
-    limit > MAX_ITEMS_PER_PAGE ? MAX_ITEMS_PER_PAGE : limit;
-
-  return newLimit;
-};
-
-export const validatePaginationFields = (
+export const normalizePagination = (
   page: number,
   limit: number,
-): number => {
-  validatePagination(page, limit);
-  const newLimit: number = validatePaginationLimit(limit);
-  return newLimit;
+): { normalizedPage: number; normalizedLimit: number } => {
+  const pageNumber = Number(page);
+  const limitNumber = Number(limit);
+
+  if (!Number.isInteger(pageNumber) || pageNumber <= 0) {
+    throw new BadRequestException('Page must be a positive integer');
+  }
+
+  if (!Number.isInteger(limitNumber) || limitNumber <= 0) {
+    throw new BadRequestException('Limit must be a positive integer');
+  }
+
+  return {
+    normalizedPage: pageNumber,
+    normalizedLimit: Math.min(limitNumber, MAX_LIMIT),
+  };
 };

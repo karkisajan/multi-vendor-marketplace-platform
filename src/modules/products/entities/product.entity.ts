@@ -41,6 +41,12 @@ export class Product {
   })
   status: ProductStatusEnum;
 
+  @Column({ nullable: true, name: 'flag_reason', type: 'varchar', length: 500 })
+  flagReason: string;
+
+  @Column({ nullable: true, type: 'uuid', name: 'flagged_by' })
+  flaggedBy: string;
+
   @ManyToOne(() => User, (user) => user.products, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'vendor_id' })
   user: User;

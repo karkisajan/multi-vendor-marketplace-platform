@@ -9,7 +9,7 @@ import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
 import { Category } from '../entities/category.entity';
 import { generateSlug } from 'src/common/utils/generate-slug.util';
-import { validatePaginationFields } from 'src/common/utils/validate-pagination.util';
+import { normalizePagination } from 'src/common/utils/validate-pagination.util';
 import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
 import { FindOptionsWhere, ILike, IsNull } from 'typeorm';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
@@ -168,10 +168,14 @@ export class CategoryService {
     page: number;
     limit: number;
   }) {
-    const newLimit: number = validatePaginationFields(page, limit);
+    const {
+      normalizedPage,
+      normalizedLimit,
+    }: { normalizedPage: number; normalizedLimit: number } =
+      normalizePagination(page, limit);
 
     const version: string = await this.getCachedCategoryVersion();
-    const cacheKey: string = `categories:v${version}:parent:page=${page}:limit=${newLimit}`;
+    const cacheKey: string = `categories:v${version}:parent:page=${page}:limit=${normalizedLimit}`;
     const cachedData = await this.cacheManager.get(cacheKey);
     if (cachedData) {
       return cachedData;
@@ -182,23 +186,28 @@ export class CategoryService {
       totalCategories,
     }: { categories: Category[]; totalCategories: number } =
       await this.categoryRepository.findAndCountParentCategories({
-        page: page,
-        limit: newLimit,
+        page: normalizedPage,
+        limit: normalizedLimit,
       });
 
     const result =
       totalCategories === 0
         ? {
             data: [],
-            meta: { page: page, limit: newLimit, total: 0, totalPages: 0 },
+            meta: {
+              page: normalizedPage,
+              limit: normalizedLimit,
+              total: 0,
+              totalPages: 0,
+            },
           }
         : {
             data: categories,
             meta: {
-              page: page,
-              limit: newLimit,
+              page: normalizedPage,
+              limit: normalizedLimit,
               total: totalCategories,
-              totalPages: Math.ceil(totalCategories / newLimit),
+              totalPages: Math.ceil(totalCategories / normalizedLimit),
             },
           };
 
@@ -225,11 +234,15 @@ export class CategoryService {
     isActive?: boolean;
     query?: string;
   }) {
-    const newLimit: number = validatePaginationFields(page, limit);
+    const {
+      normalizedPage,
+      normalizedLimit,
+    }: { normalizedPage: number; normalizedLimit: number } =
+      normalizePagination(page, limit);
 
     const version: string = await this.getCachedCategoryVersion();
     const normalizedQuery = query?.trim().toLowerCase() ?? '';
-    const cacheKey: string = `categories:v${version}:flat:page=${page}:limit=${newLimit}:status=${status ?? 'all'}:isActive=${typeof isActive === 'boolean' ? isActive : 'all'}:query=${normalizedQuery}`;
+    const cacheKey: string = `categories:v${version}:flat:page=${page}:limit=${normalizedLimit}:status=${status ?? 'all'}:isActive=${typeof isActive === 'boolean' ? isActive : 'all'}:query=${normalizedQuery}`;
     const cachedData = await this.cacheManager.get(cacheKey);
     if (cachedData) return cachedData;
 
@@ -241,8 +254,8 @@ export class CategoryService {
 
     const { categories, totalCategories } =
       await this.categoryRepository.findAndCountCategories({
-        page,
-        limit: newLimit,
+        page: normalizedPage,
+        limit: normalizedLimit,
         whereCondition,
       });
 
@@ -250,15 +263,20 @@ export class CategoryService {
       categories.length === 0
         ? {
             data: [],
-            meta: { page: page, limit: newLimit, total: 0, totalPages: 0 },
+            meta: {
+              page: normalizedPage,
+              limit: normalizedLimit,
+              total: 0,
+              totalPages: 0,
+            },
           }
         : {
             data: categories,
             meta: {
               page: page,
-              limit: newLimit,
+              limit: normalizedLimit,
               total: totalCategories,
-              totalPages: Math.ceil(totalCategories / newLimit),
+              totalPages: Math.ceil(totalCategories / normalizedLimit),
             },
           };
 

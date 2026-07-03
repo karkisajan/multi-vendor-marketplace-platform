@@ -13,7 +13,6 @@ import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
  * Required: status. Optional: reviewNote (for rejection reasons or internal notes).
  */
 export class UpdateProductStatusDto {
-  /* Target lifecycle status — publish makes it visible, reject sends it back to vendor */
   @ApiProperty({
     enum: ProductStatusEnum,
     example: ProductStatusEnum.PUBLISHED,
@@ -23,7 +22,6 @@ export class UpdateProductStatusDto {
   @IsEnum(ProductStatusEnum, { message: 'Invalid product status.' })
   status: ProductStatusEnum;
 
-  /* Admin feedback explaining why a product was rejected or archived */
   @ApiProperty({
     example: 'Product description does not meet quality standards.',
     description: 'Optional review note from admin',
@@ -34,5 +32,5 @@ export class UpdateProductStatusDto {
     message: 'Review note should not exceed 500 characters.',
   })
   @IsString({ message: 'Review note must be a string.' })
-  reviewNote?: string;
+  flagReason?: string;
 }
