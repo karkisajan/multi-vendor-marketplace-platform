@@ -17,7 +17,6 @@ import { generateSlug } from 'src/common/utils/generate-slug.util';
 import { CategoryRepository } from 'src/modules/categories/repositories/category.repository';
 import { Category } from 'src/modules/categories/entities/category.entity';
 import { CurrentUserContext } from 'src/modules/users/types/user.types';
-import { normalizePagination } from 'src/common/utils/validate-pagination.util';
 
 @Injectable()
 export class ProductService {
@@ -277,77 +276,6 @@ export class ProductService {
       id: variantId,
       message: 'Variant deleted successfully.',
     };
-  }
-
-  async getAllProductsAdmin({ page, limit }: { page: number; limit: number }) {
-    const {
-      normalizedPage,
-      normalizedLimit,
-    }: { normalizedPage: number; normalizedLimit: number } =
-      normalizePagination(page, limit);
-
-    const baseQuery = this.productRepository
-      .createQueryBuilder('product')
-      .select([
-        'product.id',
-        'product.name',
-        'product.description',
-        'product.createdAt',
-        'vendor.id',
-        'vendorProfile.id',
-        'vendorProfile.businessName',
-        'vendorProfile.businessProfileUrl',
-        'category.id',
-        'category.name',
-      ])
-      .leftJoin('product.category', 'category')
-      .leftJoin('product.user', 'vendor')
-      .leftJoin('vendor.vendorProfile', 'vendorProfile')
-      .skip((normalizedPage - 1) * normalizedLimit)
-      .take(normalizedLimit)
-      .orderBy('product.createdAt', 'DESC');
-
-    const [allProducts, totalProducts]: [Product[], number] =
-      await baseQuery.getManyAndCount();
-
-    const mappedProductsDataResponse = allProducts.map((product) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      status: product.status,
-      category: {
-        id: product.category.id,
-        name: product.category.name,
-      },
-      vendorProfile: {
-        id: product.user.vendorProfile.id,
-        businessName: product.user.vendorProfile.businessName,
-        businessProfileUrl: product.user.vendorProfile.businessProfileUrl,
-      },
-    }));
-
-    const result =
-      mappedProductsDataResponse.length === 0
-        ? {
-            data: [],
-            meta: {
-              page: normalizedPage,
-              limit: normalizedLimit,
-              total: 0,
-              totalPages: 0,
-            },
-          }
-        : {
-            data: mappedProductsDataResponse,
-            meta: {
-              page: page,
-              limit: normalizedLimit,
-              total: totalProducts,
-              totalPages: Math.ceil(totalProducts / normalizedLimit),
-            },
-          };
-
-    return result;
   }
 
   /**

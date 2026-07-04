@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
+import { Body, Controller, Param, Put } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
 import { UpdateProductStatusDto } from '../dto/admin/update-product-status.dto';
@@ -14,17 +14,6 @@ import { CurrentUserContext } from 'src/modules/users/types/user.types';
 @Controller('/admin/products')
 export class AdminProductController {
   constructor(private readonly productService: ProductService) {}
-
-  @Get('/')
-  async getAllProductsAdmin(
-    @Query('page') page: number,
-    @Query('limit') limit: number,
-  ) {
-    return await this.productService.getAllProductsAdmin({
-      page: page,
-      limit: limit,
-    });
-  }
   /**
    * ------ PUT - Update product status
    * Publishes, rejects, or archives a product with an optional review note.
