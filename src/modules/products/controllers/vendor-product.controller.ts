@@ -17,6 +17,8 @@ import {
   ApiVendorDeleteVariant,
   ApiVendorUpdateProduct,
   ApiVendorUpdateVariant,
+  ApiVendorGetAllProducts,
+  ApiVendorGetProductById,
 } from '../decorators/product-swagger.decorator';
 import { GetCurrentUser } from 'src/common/decorators/get-current-user.decorator';
 import { CurrentUserContext } from 'src/modules/users/types/user.types';
@@ -33,8 +35,9 @@ export class VendorProductController {
 
   /**
    * ------ GET - Fetch all products (Vendor)
-   * Retrieves a paginated list of all products with optional filters.
+   * Retrieves a paginated list of all products owned by the authenticated vendor with optional filters.
    */
+  @ApiVendorGetAllProducts()
   @Get('/')
   async getAllProductsAdmin(
     @GetCurrentUser() user: CurrentUserContext,
@@ -57,8 +60,9 @@ export class VendorProductController {
 
   /**
    * ------ GET - Fetch product by ID (Vendor)
-   * Retrieves detailed product information by ID.
+   * Retrieves detailed product information for a specific product owned by the vendor.
    */
+  @ApiVendorGetProductById()
   @Get('/:id')
   async getProductByIdAdmin(
     @GetCurrentUser() user: CurrentUserContext,

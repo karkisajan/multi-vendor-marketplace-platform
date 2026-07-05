@@ -91,6 +91,88 @@ export function ApiVendorDeleteProduct() {
   );
 }
 
+/**
+ * Swagger documentation decorator for vendor getting all of their own products.
+ */
+export function ApiVendorGetAllProducts() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary:
+        'Get all owned products with pagination and filters (Vendor only)',
+    }),
+    ApiQuery({
+      name: 'page',
+      required: false,
+      type: Number,
+      description: 'Page number for pagination',
+    }),
+    ApiQuery({
+      name: 'limit',
+      required: false,
+      type: Number,
+      description: 'Number of items per page',
+    }),
+    ApiQuery({
+      name: 'search',
+      required: false,
+      type: String,
+      description: 'Search query matching product name or description',
+    }),
+    ApiQuery({
+      name: 'categoryId',
+      required: false,
+      type: String,
+      description: 'Filter products by category ID',
+    }),
+    ApiQuery({
+      name: 'status',
+      required: false,
+      enum: ProductStatusEnum,
+      description: 'Filter products by status',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Products retrieved successfully.',
+    }),
+    ApiResponse({ status: 400, description: 'Validation failed.' }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized. Invalid or missing JWT.',
+    }),
+  );
+}
+
+/**
+ * Swagger documentation decorator for vendor getting their own product by ID.
+ */
+export function ApiVendorGetProductById() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary:
+        'Get detailed information of a specific owned product by ID (Vendor only)',
+    }),
+    ApiParam({
+      name: 'id',
+      type: String,
+      description: 'The unique identifier of the product',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Product retrieved successfully.',
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized. Invalid or missing JWT.',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Product not found.',
+    }),
+  );
+}
+
 // ───────────────────────────── VENDOR VARIANT ─────────────────────────────
 
 /**
