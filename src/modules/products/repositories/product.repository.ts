@@ -14,8 +14,8 @@ export class ProductRepository extends Repository<Product> {
    * Finds a product by its primary key, including related variants.
    */
   async findProductById(id: string): Promise<Product | null> {
-    return this.findOne({
-      where: { id },
+    return await this.findOne({
+      where: { id: id },
     });
   }
 

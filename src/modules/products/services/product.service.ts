@@ -28,10 +28,7 @@ export class ProductService {
     private readonly categoryRepository: CategoryRepository,
   ) {}
 
-  // =========================================================================
-  // ========================== ADMIN SPECIFIC SERVICES =========================
-  // =========================================================================
-
+  // ========================== ADMIN SPECIFIC SERVICES ================================
   /**
    * Retrieves a paginated list of all products in the system for administrative purposes.
    * Allows filtering by search term (matching product name or vendor business name),
@@ -222,32 +219,32 @@ export class ProductService {
    * Transitions a product through lifecycle states: publish, reject, or archive.
    * Accepts an optional reviewNote for admin feedback visible to the vendor.
    */
-  async adminUpdateProductStatus(
+  async updateProductStatusAdmin(
     productId: string,
     updateProductStatusDto: UpdateProductStatusDto,
     user: CurrentUserContext,
   ) {
     const product: Product | null =
       await this.productRepository.findProductById(productId);
+
     if (!product) {
       throw new NotFoundException('Product not found.');
     }
 
+    await this.productRepository.updateProduct(productId, {
+      status: updateProductStatusDto.status,
+      flagReason: updateProductStatusDto.flagReason,
+      flaggedBy: user.id,
+    });
+
     const updatedProduct: Product | null =
-      await this.productRepository.updateProduct(productId, {
-        status: updateProductStatusDto.status,
-        flagReason: updateProductStatusDto.flagReason,
-        flaggedBy: user.id,
-      });
-    if (!updatedProduct) {
-      throw new NotFoundException('Product not found after update.');
-    }
+      await this.productRepository.findProductById(productId);
 
     return {
       message: 'Product status updated successfully.',
-      id: updatedProduct.id,
-      name: updatedProduct.name,
-      status: updatedProduct.status,
+      id: updatedProduct?.id,
+      name: updatedProduct?.name,
+      status: updatedProduct?.status,
       flagReason: updateProductStatusDto.flagReason ?? null,
     };
   }
@@ -258,13 +255,14 @@ export class ProductService {
    * If name changes without an explicit slug, regenerates the slug and checks for conflicts.
    * If a slug is explicitly provided, it is used directly after conflict validation.
    */
-  async adminUpdateProduct(
+  async updateProductAdmin(
     productId: string,
     adminUpdateProductDto: AdminUpdateProductDto,
     user: CurrentUserContext,
   ) {
     const product: Product | null =
       await this.productRepository.findProductById(productId);
+
     if (!product) {
       throw new NotFoundException('Product not found.');
     }
@@ -311,27 +309,27 @@ export class ProductService {
       updateData.flaggedBy = user.id;
     }
 
+    await this.productRepository.updateProduct(productId, updateData);
     const updatedProduct: Product | null =
-      await this.productRepository.updateProduct(productId, updateData);
-    if (!updatedProduct) {
-      throw new NotFoundException('Product not found after update.');
-    }
+      await this.productRepository.findProductById(productId);
 
     return {
       message: 'Product updated successfully.',
-      id: updatedProduct.id,
-      name: updatedProduct.name,
-      slug: updatedProduct.slug,
-      description: updatedProduct.description,
-      categoryId: updatedProduct.categoryId,
-      status: updatedProduct.status,
+      id: updatedProduct?.id,
+      name: updatedProduct?.name,
+      slug: updatedProduct?.slug,
+      description: updatedProduct?.description,
+      categoryId: updatedProduct?.categoryId,
+      status: updatedProduct?.status,
     };
   }
 
-  // =========================================================================
   // ========================= VENDOR SPECIFIC METHODS =========================
-  // =========================================================================
-
+  /**
+   * Retrieves a paginated list of all products in the system for administrative purposes.
+   * Allows filtering by search term (matching product name or vendor business name),
+   * category ID, and product status.
+   */
   async getAllProductsVendor({
     vendorId,
     page,
@@ -437,6 +435,7 @@ export class ProductService {
   }) {
     const product: Product | null =
       await this.productRepository.findProductByIdAndVendor(id, vendorId);
+
     if (!product) {
       throw new NotFoundException('Product not found.');
     }
@@ -510,14 +509,15 @@ export class ProductService {
       await this.categoryRepository.findCategoryById(
         createProductDto.categoryId,
       );
+
     if (!categoryExists) {
       throw new NotFoundException('Category not found.');
     }
 
     const slug: string = generateSlug(createProductDto.name);
-
     const existingProduct: Product | null =
       await this.productRepository.findProductBySlug(slug);
+
     if (existingProduct) {
       throw new ConflictException('Product with this slug already exists.');
     }
@@ -555,6 +555,7 @@ export class ProductService {
         productId,
         vendorId,
       );
+
     if (!product) {
       throw new NotFoundException('Product not found.');
     }
@@ -582,20 +583,18 @@ export class ProductService {
       updateData.categoryId = updateProductDto.categoryId;
     }
 
+    await this.productRepository.updateProduct(productId, updateData);
     const updatedProduct: Product | null =
-      await this.productRepository.updateProduct(productId, updateData);
-    if (!updatedProduct) {
-      throw new NotFoundException('Product not found after update.');
-    }
+      await this.productRepository.findProductById(productId);
 
     return {
       message: 'Product updated successfully.',
-      id: updatedProduct.id,
-      name: updatedProduct.name,
-      slug: updatedProduct.slug,
-      description: updatedProduct.description,
-      categoryId: updatedProduct.categoryId,
-      status: updatedProduct.status,
+      id: updatedProduct?.id,
+      name: updatedProduct?.name,
+      slug: updatedProduct?.slug,
+      description: updatedProduct?.description,
+      categoryId: updatedProduct?.categoryId,
+      status: updatedProduct?.status,
     };
   }
 
@@ -610,6 +609,7 @@ export class ProductService {
         productId,
         vendorId,
       );
+
     if (!product) {
       throw new NotFoundException('Product not found.');
     }
@@ -749,7 +749,5 @@ export class ProductService {
     };
   }
 
-  // =========================================================================
   // ======================== CUSTOMER SPECIFIC SERVICES ========================
-  // =========================================================================
 }

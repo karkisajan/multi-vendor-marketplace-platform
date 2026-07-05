@@ -6,8 +6,6 @@ import { AdminUpdateProductDto } from '../dto/admin/admin-update-product.dto';
 import {
   ApiAdminUpdateProduct,
   ApiAdminUpdateProductStatus,
-  ApiAdminGetAllProducts,
-  ApiAdminGetProductById,
 } from '../decorators/product-swagger.decorator';
 import { GetCurrentUser } from 'src/common/decorators/get-current-user.decorator';
 import { CurrentUserContext } from 'src/modules/users/types/user.types';
@@ -18,11 +16,6 @@ import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 export class AdminProductController {
   constructor(private readonly productService: ProductService) {}
 
-  /**
-   * ------ GET - Fetch all products (Admin)
-   * Retrieves a paginated list of all products with optional filters.
-   */
-  @ApiAdminGetAllProducts()
   @Get('/')
   async getAllProductsAdmin(
     @Query('page') page: number,
@@ -40,11 +33,6 @@ export class AdminProductController {
     });
   }
 
-  /**
-   * ------ GET - Fetch product by ID (Admin)
-   * Retrieves detailed product information by ID.
-   */
-  @ApiAdminGetProductById()
   @Get('/:id')
   async getProductByIdAdmin(@Param('id') id: string) {
     return await this.productService.getProductByIdAdmin(id);
@@ -56,12 +44,12 @@ export class AdminProductController {
    */
   @ApiAdminUpdateProductStatus()
   @Put('/:id/status')
-  async updateProductStatus(
+  async updateProductStatusAdmin(
     @Param('id') id: string,
     @Body() updateProductStatusDto: UpdateProductStatusDto,
     @GetCurrentUser() user: CurrentUserContext,
   ) {
-    return this.productService.adminUpdateProductStatus(
+    return this.productService.updateProductStatusAdmin(
       id,
       updateProductStatusDto,
       user,
@@ -74,12 +62,12 @@ export class AdminProductController {
    */
   @ApiAdminUpdateProduct()
   @Put('/:id')
-  async updateProduct(
+  async updateProductAdmin(
     @Param('id') id: string,
     @Body() adminUpdateProductDto: AdminUpdateProductDto,
     @GetCurrentUser() user: CurrentUserContext,
   ) {
-    return this.productService.adminUpdateProduct(
+    return this.productService.updateProductAdmin(
       id,
       adminUpdateProductDto,
       user,
