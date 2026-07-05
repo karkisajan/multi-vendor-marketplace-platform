@@ -104,16 +104,22 @@ async function seedProducts(): Promise<void> {
 
   const categories = await manager.find(Category);
   if (categories.length === 0) {
-    console.warn('No categories found. Please run the category seed script first!');
+    console.warn(
+      'No categories found. Please run the category seed script first!',
+    );
     return;
   }
 
-  console.log(`Found ${vendors.length} vendors and ${categories.length} categories.`);
+  console.log(
+    `Found ${vendors.length} vendors and ${categories.length} categories.`,
+  );
 
   for (let v = 0; v < vendors.length; v++) {
     const vendor = vendors[v];
     const productCount = getRandomNumber(150, 200);
-    console.log(`Generating ${productCount} products for vendor: ${vendor.email} (${v + 1}/${vendors.length})...`);
+    console.log(
+      `Generating ${productCount} products for vendor: ${vendor.email} (${v + 1}/${vendors.length})...`,
+    );
 
     const products: Product[] = [];
 
@@ -121,7 +127,9 @@ async function seedProducts(): Promise<void> {
       const adjective = getRandomElement(ADJECTIVES);
       const core = getRandomElement(PRODUCT_CORES);
       const productName = `${adjective} ${core} - Batch ${v + 1} #${p + 1}`;
-      const slug = generateSlug(`${productName}-${vendor.id.substring(0, 8)}-${p}`);
+      const slug = generateSlug(
+        `${productName}-${vendor.id.substring(0, 8)}-${p}`,
+      );
 
       const product = new Product();
       product.vendorId = vendor.id;
@@ -129,7 +137,10 @@ async function seedProducts(): Promise<void> {
       product.name = productName;
       product.slug = slug;
       product.description = `Experience the best quality with our ${adjective.toLowerCase()} ${core.toLowerCase()}. Built with premium materials for maximum durability and satisfaction.`;
-      product.status = Math.random() > 0.15 ? ProductStatusEnum.PUBLISHED : ProductStatusEnum.DRAFT;
+      product.status =
+        Math.random() > 0.15
+          ? ProductStatusEnum.PUBLISHED
+          : ProductStatusEnum.DRAFT;
 
       const variants: ProductVariant[] = [];
       const numVariants = getRandomNumber(3, 5); // At least 3 variants
@@ -139,7 +150,7 @@ async function seedProducts(): Promise<void> {
       for (let varIdx = 0; varIdx < numVariants; varIdx++) {
         const variant = new ProductVariant();
         const basePrice = getRandomNumber(15, 300);
-        variant.selllingPrice = basePrice;
+        variant.sellingPrice = basePrice;
         variant.crossPrice = Number((basePrice * 1.25).toFixed(2));
         variant.costPrice = Number((basePrice * 0.6).toFixed(2));
         variant.stockQuantity = getRandomNumber(10, 200);

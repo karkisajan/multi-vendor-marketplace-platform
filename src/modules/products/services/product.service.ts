@@ -17,6 +17,8 @@ import { generateSlug } from 'src/common/utils/generate-slug.util';
 import { CategoryRepository } from 'src/modules/categories/repositories/category.repository';
 import { Category } from 'src/modules/categories/entities/category.entity';
 import { CurrentUserContext } from 'src/modules/users/types/user.types';
+import { normalizePagination } from 'src/common/utils/validate-pagination.util';
+import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 
 @Injectable()
 export class ProductService {
@@ -26,7 +28,477 @@ export class ProductService {
     private readonly categoryRepository: CategoryRepository,
   ) {}
 
-  /* ------- Vendor sepcific services -------- */
+  // =========================================================================
+  // ========================== ADMIN SPECIFIC SERVICES =========================
+  // =========================================================================
+
+  /**
+   * Retrieves a paginated list of all products in the system for administrative purposes.
+   * Allows filtering by search term (matching product name or vendor business name),
+   * category ID, and product status.
+   */
+  async getAllProductsAdmin({
+    page,
+    limit,
+    search,
+    categoryId,
+    status,
+  }: {
+    page: number;
+    limit: number;
+    search?: string;
+    categoryId?: string;
+    status?: ProductStatusEnum;
+  }) {
+    const {
+      normalizedPage,
+      normalizedLimit,
+    }: { normalizedPage: number; normalizedLimit: number } =
+      normalizePagination(page, limit);
+
+    const productBaseQuery = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoin('product.category', 'category')
+      .leftJoin('product.user', 'vendor')
+      .leftJoin('vendor.vendorProfile', 'vendorProfile')
+      .select([
+        'product.id',
+        'product.name',
+        'product.description',
+        'product.status',
+        'product.createdAt',
+        'vendor.id',
+        'vendorProfile.id',
+        'vendorProfile.businessName',
+        'category.id',
+        'category.name',
+      ]);
+
+    if (search?.trim()) {
+      productBaseQuery.andWhere(
+        `(product.name ILIKE :search OR vendorProfile.businessName ILIKE :search)`,
+        { search: `%${search}%` },
+      );
+    }
+
+    if (status) {
+      productBaseQuery.andWhere('product.status = :status', { status: status });
+    }
+
+    if (categoryId) {
+      productBaseQuery.andWhere('category.id = :categoryId', {
+        categoryId: categoryId,
+      });
+    }
+
+    const [productsData, totalProductsData]: [Product[], number] =
+      await productBaseQuery
+        .skip((normalizedPage - 1) * normalizedLimit)
+        .take(normalizedLimit)
+        .orderBy('product.createdAt', 'DESC')
+        .getManyAndCount();
+
+    const refinedProductsResponseData = productsData.map((product) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      status: product.status,
+      vendorProfile: {
+        id: product.user.id,
+        businessName: product.user.vendorProfile.businessName,
+      },
+      category: {
+        id: product.category.id,
+        name: product.category.name,
+      },
+    }));
+
+    const result =
+      refinedProductsResponseData.length === 0
+        ? {
+            data: [],
+            meta: {
+              page: normalizedPage,
+              limit: normalizedLimit,
+              totalPages: Math.ceil(totalProductsData / normalizedLimit),
+              total: totalProductsData,
+            },
+          }
+        : {
+            data: refinedProductsResponseData,
+            meta: {
+              page: normalizedPage,
+              limit: normalizedLimit,
+              totalPages: Math.ceil(totalProductsData / normalizedLimit),
+              total: totalProductsData,
+            },
+          };
+
+    return result;
+  }
+
+  /**
+   * Retrieves detailed product information for administrative viewing.
+   * Returns complete details including product metadata, vendor profile, category,
+   * and all product variants with their associated images.
+   */
+  async getProductByIdAdmin(id: string) {
+    const product: Product | null =
+      await this.productRepository.findProductById(id);
+    if (!product) {
+      throw new NotFoundException('Product not found.');
+    }
+
+    const productBaseQuery = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoin('product.productVariants', 'productVariant')
+      .leftJoin('productVariant.productImages', 'productImage')
+      .leftJoin('product.category', 'category')
+      .leftJoin('product.user', 'vendor')
+      .leftJoin('vendor.vendorProfile', 'vendorProfile')
+      .select([
+        'product.id',
+        'product.name',
+        'product.slug',
+        'product.description',
+        'product.status',
+        'product.createdAt',
+        'productVariant.id',
+        'productVariant.sellingPrice',
+        'productVariant.crossPrice',
+        'productVariant.costPrice',
+        'productVariant.stockQuantity',
+        'productVariant.status',
+        'productVariant.variantAttributes',
+        'productVariant.createdAt',
+        'productImage.id',
+        'productImage.imageUrl',
+        'productImage.isPrimary',
+        'category.id',
+        'category.name',
+        'vendor.id',
+        'vendorProfile.id',
+        'vendorProfile.businessName',
+        'vendorProfile.businessProfileUrl',
+      ]);
+
+    const productData: Product | null = await productBaseQuery.getOne();
+
+    const refinedProductResponseData = {
+      id: productData?.id,
+      name: productData?.name,
+      slug: productData?.slug,
+      description: productData?.description,
+      status: productData?.status,
+      vendorProfile: {
+        id: productData?.user.id,
+        businessName: productData?.user.vendorProfile.businessName,
+        businessProfileUrl: productData?.user.vendorProfile.businessProfileUrl,
+      },
+      category: {
+        id: productData?.category.id,
+        name: productData?.category.name,
+      },
+      productVariants: productData?.productVariants.map((productVariant) => ({
+        id: productVariant.id,
+        sellingPrice: productVariant.sellingPrice,
+        crossPrice: productVariant.crossPrice,
+        costPrice: productVariant.costPrice,
+        stockQuantity: productVariant.stockQuantity,
+        status: productVariant.status,
+        variantAttributes: productVariant.variantAttributes,
+        productImages: productVariant.productImages.map((productImage) => ({
+          id: productImage.id,
+          imageUrl: productImage.imageUrl,
+        })),
+      })),
+    };
+
+    return refinedProductResponseData;
+  }
+
+  /**
+   * ------ PUT - Update product status (Admin)
+   * Transitions a product through lifecycle states: publish, reject, or archive.
+   * Accepts an optional reviewNote for admin feedback visible to the vendor.
+   */
+  async adminUpdateProductStatus(
+    productId: string,
+    updateProductStatusDto: UpdateProductStatusDto,
+    user: CurrentUserContext,
+  ) {
+    const product: Product | null =
+      await this.productRepository.findProductById(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found.');
+    }
+
+    const updatedProduct: Product | null =
+      await this.productRepository.updateProduct(productId, {
+        status: updateProductStatusDto.status,
+        flagReason: updateProductStatusDto.flagReason,
+        flaggedBy: user.id,
+      });
+    if (!updatedProduct) {
+      throw new NotFoundException('Product not found after update.');
+    }
+
+    return {
+      message: 'Product status updated successfully.',
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      status: updatedProduct.status,
+      flagReason: updateProductStatusDto.flagReason ?? null,
+    };
+  }
+
+  /**
+   * ------ PUT - Force-edit product (Admin)
+   * Allows admin to update any product field including name, description, slug, categoryId, and status.
+   * If name changes without an explicit slug, regenerates the slug and checks for conflicts.
+   * If a slug is explicitly provided, it is used directly after conflict validation.
+   */
+  async adminUpdateProduct(
+    productId: string,
+    adminUpdateProductDto: AdminUpdateProductDto,
+    user: CurrentUserContext,
+  ) {
+    const product: Product | null =
+      await this.productRepository.findProductById(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found.');
+    }
+
+    const updateData: Partial<Product> = {};
+    if (adminUpdateProductDto.name !== undefined) {
+      updateData.name = adminUpdateProductDto.name;
+      if (adminUpdateProductDto.slug === undefined) {
+        const slug: string = generateSlug(adminUpdateProductDto.name);
+        const existingSlug: Product | null =
+          await this.productRepository.findProductBySlug(slug);
+        if (existingSlug && existingSlug.id !== productId) {
+          throw new ConflictException('Product with this slug already exists.');
+        }
+        updateData.slug = slug;
+      }
+    }
+
+    if (adminUpdateProductDto.slug !== undefined) {
+      const existingSlug: Product | null =
+        await this.productRepository.findProductBySlug(
+          adminUpdateProductDto.slug,
+        );
+      if (existingSlug && existingSlug.id !== productId) {
+        throw new ConflictException('Product with this slug already exists.');
+      }
+      updateData.slug = adminUpdateProductDto.slug;
+    }
+
+    if (adminUpdateProductDto.description !== undefined) {
+      updateData.description = adminUpdateProductDto.description;
+    }
+
+    if (adminUpdateProductDto.categoryId !== undefined) {
+      updateData.categoryId = adminUpdateProductDto.categoryId;
+    }
+
+    if (adminUpdateProductDto.status !== undefined) {
+      updateData.status = adminUpdateProductDto.status;
+    }
+
+    if (user && adminUpdateProductDto.flagReason !== undefined) {
+      updateData.flagReason = adminUpdateProductDto.flagReason;
+      updateData.flaggedBy = user.id;
+    }
+
+    const updatedProduct: Product | null =
+      await this.productRepository.updateProduct(productId, updateData);
+    if (!updatedProduct) {
+      throw new NotFoundException('Product not found after update.');
+    }
+
+    return {
+      message: 'Product updated successfully.',
+      id: updatedProduct.id,
+      name: updatedProduct.name,
+      slug: updatedProduct.slug,
+      description: updatedProduct.description,
+      categoryId: updatedProduct.categoryId,
+      status: updatedProduct.status,
+    };
+  }
+
+  // =========================================================================
+  // ========================= VENDOR SPECIFIC METHODS =========================
+  // =========================================================================
+
+  async getAllProductsVendor({
+    vendorId,
+    page,
+    limit,
+    search,
+    categoryId,
+    status,
+  }: {
+    vendorId: string;
+    page: number;
+    limit: number;
+    search?: string;
+    categoryId?: string;
+    status?: ProductStatusEnum;
+  }) {
+    const {
+      normalizedPage,
+      normalizedLimit,
+    }: { normalizedPage: number; normalizedLimit: number } =
+      normalizePagination(page, limit);
+
+    const productBaseQuery = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoin('product.category', 'category')
+      .select([
+        'product.id',
+        'product.name',
+        'product.description',
+        'product.status',
+        'product.createdAt',
+        'category.id',
+        'category.name',
+      ]);
+
+    if (search?.trim()) {
+      productBaseQuery.andWhere(
+        `(product.name ILIKE :search OR product.description ILIKE :search)`,
+        {
+          search: `%${search}%`,
+        },
+      );
+    }
+
+    if (status) {
+      productBaseQuery.andWhere('product.status = :status', { status: status });
+    }
+
+    if (categoryId) {
+      productBaseQuery.andWhere('category.id = :categoryId', {
+        categoryId: categoryId,
+      });
+    }
+
+    const [productsData, totalProductsData]: [Product[], number] =
+      await productBaseQuery
+        .where('product.vendorId = :vendorId', { vendorId: vendorId })
+        .skip((normalizedPage - 1) * normalizedLimit)
+        .take(normalizedLimit)
+        .orderBy('product.createdAt', 'DESC')
+        .getManyAndCount();
+
+    const refinedProductsResponseData = productsData.map((product) => ({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      status: product.status,
+      category: {
+        id: product.category.id,
+        name: product.category.name,
+      },
+    }));
+
+    const result =
+      refinedProductsResponseData.length === 0
+        ? {
+            data: [],
+            meta: {
+              page: normalizedPage,
+              limit: normalizedLimit,
+              totalPages: Math.ceil(totalProductsData / normalizedLimit),
+              total: totalProductsData,
+            },
+          }
+        : {
+            data: refinedProductsResponseData,
+            meta: {
+              page: normalizedPage,
+              limit: normalizedLimit,
+              totalPages: Math.ceil(totalProductsData / normalizedLimit),
+              total: totalProductsData,
+            },
+          };
+
+    return result;
+  }
+
+  async getProductByIdVendor({
+    id,
+    vendorId,
+  }: {
+    id: string;
+    vendorId: string;
+  }) {
+    const product: Product | null =
+      await this.productRepository.findProductByIdAndVendor(id, vendorId);
+    if (!product) {
+      throw new NotFoundException('Product not found.');
+    }
+
+    const productBaseQuery = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoin('product.productVariants', 'productVariant')
+      .leftJoin('productVariant.productImages', 'productImage')
+      .leftJoin('product.category', 'category')
+      .select([
+        'product.id',
+        'product.name',
+        'product.slug',
+        'product.description',
+        'product.status',
+        'product.createdAt',
+        'productVariant.id',
+        'productVariant.sellingPrice',
+        'productVariant.crossPrice',
+        'productVariant.costPrice',
+        'productVariant.stockQuantity',
+        'productVariant.status',
+        'productVariant.variantAttributes',
+        'productVariant.createdAt',
+        'productImage.id',
+        'productImage.imageUrl',
+        'productImage.isPrimary',
+        'category.id',
+        'category.name',
+      ]);
+
+    const productData: Product | null = await productBaseQuery
+      .where('product.vendorId = :vendorId', { vendorId: vendorId })
+      .getOne();
+
+    const refinedProductResponseData = {
+      id: productData?.id,
+      name: productData?.name,
+      slug: productData?.slug,
+      description: productData?.description,
+      status: productData?.status,
+      category: {
+        id: productData?.category.id,
+        name: productData?.category.name,
+      },
+      productVariants: productData?.productVariants.map((productVariant) => ({
+        id: productVariant.id,
+        sellingPrice: productVariant.sellingPrice,
+        crossPrice: productVariant.crossPrice,
+        costPrice: productVariant.costPrice,
+        stockQuantity: productVariant.stockQuantity,
+        status: productVariant.status,
+        variantAttributes: productVariant.variantAttributes,
+        productImages: productVariant.productImages.map((productImage) => ({
+          id: productImage.id,
+          imageUrl: productImage.imageUrl,
+        })),
+      })),
+    };
+
+    return refinedProductResponseData;
+  }
 
   /**
    * ------ POST - Create product (Vendor)
@@ -171,7 +643,7 @@ export class ProductService {
     const savedVariant: ProductVariant =
       await this.productVariantRepository.createVariant({
         productId: productId,
-        selllingPrice: createProductVariantDto.sellingPrice,
+        sellingPrice: createProductVariantDto.sellingPrice,
         crossPrice: createProductVariantDto.crossPrice,
         costPrice: createProductVariantDto.costPrice,
         stockQuantity: createProductVariantDto.stockQuantity,
@@ -183,7 +655,7 @@ export class ProductService {
       message: 'Variant created successfully.',
       id: savedVariant.id,
       productId: savedVariant.productId,
-      sellingPrice: savedVariant.selllingPrice,
+      sellingPrice: savedVariant.sellingPrice,
       crossPrice: savedVariant.crossPrice,
       costPrice: savedVariant.costPrice,
       stockQuantity: savedVariant.stockQuantity,
@@ -210,7 +682,7 @@ export class ProductService {
 
     const updateData: Partial<ProductVariant> = {};
     if (updateProductVariantDto.sellingPrice !== undefined) {
-      updateData.selllingPrice = updateProductVariantDto.sellingPrice;
+      updateData.sellingPrice = updateProductVariantDto.sellingPrice;
     }
     if (updateProductVariantDto.crossPrice !== undefined) {
       updateData.crossPrice = updateProductVariantDto.crossPrice;
@@ -238,7 +710,7 @@ export class ProductService {
       message: 'Variant updated successfully.',
       id: updatedVariant.id,
       productId: updatedVariant.productId,
-      sellingPrice: updatedVariant.selllingPrice,
+      sellingPrice: updatedVariant.sellingPrice,
       crossPrice: updatedVariant.crossPrice,
       costPrice: updatedVariant.costPrice,
       stockQuantity: updatedVariant.stockQuantity,
@@ -259,7 +731,6 @@ export class ProductService {
       throw new NotFoundException('Variant not found.');
     }
 
-    /* Ensure at least one variant remains on the product after deletion */
     const variantCount: number =
       await this.productVariantRepository.countVariantsByProductId(
         variant.productId,
@@ -278,114 +749,7 @@ export class ProductService {
     };
   }
 
-  /**
-   * ------ PUT - Update product status (Admin)
-   * Transitions a product through lifecycle states: publish, reject, or archive.
-   * Accepts an optional reviewNote for admin feedback visible to the vendor.
-   */
-  async adminUpdateProductStatus(
-    productId: string,
-    updateProductStatusDto: UpdateProductStatusDto,
-    user: CurrentUserContext,
-  ) {
-    const product: Product | null =
-      await this.productRepository.findProductById(productId);
-    if (!product) {
-      throw new NotFoundException('Product not found.');
-    }
-
-    const updatedProduct: Product | null =
-      await this.productRepository.updateProduct(productId, {
-        status: updateProductStatusDto.status,
-        flagReason: updateProductStatusDto.flagReason,
-        flaggedBy: user.id,
-      });
-    if (!updatedProduct) {
-      throw new NotFoundException('Product not found after update.');
-    }
-
-    return {
-      message: 'Product status updated successfully.',
-      id: updatedProduct.id,
-      name: updatedProduct.name,
-      status: updatedProduct.status,
-      flagReason: updateProductStatusDto.flagReason ?? null,
-    };
-  }
-
-  /**
-   * ------ PUT - Force-edit product (Admin)
-   * Allows admin to update any product field including name, description, slug, categoryId, and status.
-   * If name changes without an explicit slug, regenerates the slug and checks for conflicts.
-   * If a slug is explicitly provided, it is used directly after conflict validation.
-   */
-  async adminUpdateProduct(
-    productId: string,
-    adminUpdateProductDto: AdminUpdateProductDto,
-    user: CurrentUserContext,
-  ) {
-    const product: Product | null =
-      await this.productRepository.findProductById(productId);
-    if (!product) {
-      throw new NotFoundException('Product not found.');
-    }
-
-    const updateData: Partial<Product> = {};
-    if (adminUpdateProductDto.name !== undefined) {
-      updateData.name = adminUpdateProductDto.name;
-      if (adminUpdateProductDto.slug === undefined) {
-        const slug: string = generateSlug(adminUpdateProductDto.name);
-        const existingSlug: Product | null =
-          await this.productRepository.findProductBySlug(slug);
-        if (existingSlug && existingSlug.id !== productId) {
-          throw new ConflictException('Product with this slug already exists.');
-        }
-        updateData.slug = slug;
-      }
-    }
-
-    if (adminUpdateProductDto.slug !== undefined) {
-      const existingSlug: Product | null =
-        await this.productRepository.findProductBySlug(
-          adminUpdateProductDto.slug,
-        );
-      if (existingSlug && existingSlug.id !== productId) {
-        throw new ConflictException('Product with this slug already exists.');
-      }
-      updateData.slug = adminUpdateProductDto.slug;
-    }
-
-    if (adminUpdateProductDto.description !== undefined) {
-      updateData.description = adminUpdateProductDto.description;
-    }
-
-    if (adminUpdateProductDto.categoryId !== undefined) {
-      updateData.categoryId = adminUpdateProductDto.categoryId;
-    }
-
-    if (adminUpdateProductDto.status !== undefined) {
-      updateData.status = adminUpdateProductDto.status;
-    }
-
-    if (user && adminUpdateProductDto.flagReason !== undefined) {
-      updateData.flagReason = adminUpdateProductDto.flagReason;
-      updateData.flaggedBy = user.id;
-    }
-
-    const updatedProduct: Product | null =
-      await this.productRepository.updateProduct(productId, updateData);
-    if (!updatedProduct) {
-      throw new NotFoundException('Product not found after update.');
-    }
-
-    return {
-      message: 'Product updated successfully.',
-      id: updatedProduct.id,
-      name: updatedProduct.name,
-      slug: updatedProduct.slug,
-      description: updatedProduct.description,
-      categoryId: updatedProduct.categoryId,
-      status: updatedProduct.status,
-    };
-  }
+  // =========================================================================
+  // ======================== CUSTOMER SPECIFIC SERVICES ========================
+  // =========================================================================
 }

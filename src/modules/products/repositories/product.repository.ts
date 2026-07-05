@@ -16,7 +16,6 @@ export class ProductRepository extends Repository<Product> {
   async findProductById(id: string): Promise<Product | null> {
     return this.findOne({
       where: { id },
-      relations: ['productVariants'],
     });
   }
 
@@ -36,7 +35,6 @@ export class ProductRepository extends Repository<Product> {
   ): Promise<Product | null> {
     return this.findOne({
       where: { id, vendorId },
-      relations: ['productVariants'],
     });
   }
 

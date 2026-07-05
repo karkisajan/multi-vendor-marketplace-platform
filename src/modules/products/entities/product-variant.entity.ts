@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { Product } from './product.entity';
 import { ProductImage } from './product-image.entity';
+import { VariantStatusEnum } from 'src/common/enums/product-status.enum';
 
 @Entity({ name: 'product_variants' })
 export class ProductVariant {
@@ -21,7 +22,7 @@ export class ProductVariant {
   productId: string;
 
   @Column({ nullable: true, type: 'decimal', precision: 10, scale: 2 })
-  selllingPrice: number;
+  sellingPrice: number;
 
   @Column({ nullable: true, type: 'decimal', precision: 10, scale: 2 })
   crossPrice: number;
@@ -31,6 +32,9 @@ export class ProductVariant {
 
   @Column({ nullable: true, type: 'int' })
   stockQuantity: number;
+
+  @Column({ nullable: true, type: 'enum', enum: VariantStatusEnum })
+  status: VariantStatusEnum;
 
   @Column({ nullable: true, type: 'jsonb' })
   variantAttributes: Record<string, any>;

@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Param, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ProductService } from '../services/product.service';
 import {
@@ -15,11 +24,51 @@ import { CreateProductDto } from '../dto/vendor/create-product.dto';
 import { UpdateProductDto } from '../dto/vendor/update-product.dto';
 import { CreateProductVariantDto } from '../dto/vendor/create-product-variant.dto';
 import { UpdateProductVariantDto } from '../dto/vendor/update-product-variant.dto';
+import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 
 @ApiTags('Vendor Products')
 @Controller('/vendor/products')
 export class VendorProductController {
   constructor(private readonly productService: ProductService) {}
+
+  /**
+   * ------ GET - Fetch all products (Vendor)
+   * Retrieves a paginated list of all products with optional filters.
+   */
+  @Get('/')
+  async getAllProductsAdmin(
+    @GetCurrentUser() user: CurrentUserContext,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
+    @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('status') status?: ProductStatusEnum,
+  ) {
+    const vendorId: string = user.id;
+    return await this.productService.getAllProductsVendor({
+      vendorId,
+      page,
+      limit,
+      search,
+      categoryId,
+      status,
+    });
+  }
+
+  /**
+   * ------ GET - Fetch product by ID (Vendor)
+   * Retrieves detailed product information by ID.
+   */
+  @Get('/:id')
+  async getProductByIdAdmin(
+    @GetCurrentUser() user: CurrentUserContext,
+    @Param('id') id: string,
+  ) {
+    return await this.productService.getProductByIdVendor({
+      id: id,
+      vendorId: user.id,
+    });
+  }
 
   /**
    * ------ POST - Create product
