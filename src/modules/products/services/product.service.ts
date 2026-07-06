@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -19,6 +20,8 @@ import { Category } from 'src/modules/categories/entities/category.entity';
 import { CurrentUserContext } from 'src/modules/users/types/user.types';
 import { normalizePagination } from 'src/common/utils/validate-pagination.util';
 import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
+import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class ProductService {
@@ -26,7 +29,27 @@ export class ProductService {
     private readonly productRepository: ProductRepository,
     private readonly productVariantRepository: ProductVariantRepository,
     private readonly categoryRepository: CategoryRepository,
+
+    @Inject(CACHE_MANAGER)
+    private readonly cacheManager: Cache,
   ) {}
+
+  /**
+   * Reads the current category cache namespace version; defaults to version 1
+   * so read endpoints can build stable keys before any mutation has occurred.
+   */
+  private async getProductCachedVersion(): Promise<string> {
+    const version = await this.cacheManager.get<string>('products:version');
+    return String(version);
+  }
+
+  /**
+   * Advances the category cache namespace after create, update, or delete.
+   * Existing list/tree entries stay in Redis until TTL expiry, while new reads use a unique token.
+   */
+  private async invalidateCachedProductsVersion(): Promise<void> {
+    await this.cacheManager.set('products:version', randomUUID);
+  }
 
   // ========================== ADMIN SPECIFIC SERVICES ================================
   /**
@@ -52,6 +75,17 @@ export class ProductService {
       normalizedLimit,
     }: { normalizedPage: number; normalizedLimit: number } =
       normalizePagination(page, limit);
+
+    const version: string = await this.getProductCachedVersion();
+    const cacheKey: string = `products:admin:v${version}:${JSON.stringify({
+      page: normalizedPage,
+      limit: normalizedLimit,
+      search: search ?? '',
+      categoryId: categoryId ?? '',
+      status: status ?? '',
+    })}`;
+    const cachedProductsData = await this.cacheManager.get(cacheKey);
+    if (cachedProductsData) return cachedProductsData;
 
     const productBaseQuery = this.productRepository
       .createQueryBuilder('product')
@@ -131,6 +165,7 @@ export class ProductService {
             },
           };
 
+    await this.cacheManager.set(cacheKey, result, 10 * 1000);
     return result;
   }
 
@@ -140,8 +175,16 @@ export class ProductService {
    * and all product variants with their associated images.
    */
   async getProductByIdAdmin(id: string) {
+    const version: string = await this.getProductCachedVersion();
+    const cacheKey: string = `products:admin:detail:v${version}:${id}`;
+    const cachedProductsData = await this.cacheManager.get(cacheKey);
+    if (cachedProductsData) {
+      return cachedProductsData;
+    }
+
     const product: Product | null =
       await this.productRepository.findProductById(id);
+
     if (!product) {
       throw new NotFoundException('Product not found.');
     }
@@ -211,6 +254,11 @@ export class ProductService {
       })),
     };
 
+    await this.cacheManager.set(
+      cacheKey,
+      refinedProductResponseData,
+      10 * 1000,
+    );
     return refinedProductResponseData;
   }
 
@@ -239,6 +287,8 @@ export class ProductService {
 
     const updatedProduct: Product | null =
       await this.productRepository.findProductById(productId);
+
+    await this.invalidateCachedProductsVersion();
 
     return {
       message: 'Product status updated successfully.',
@@ -310,8 +360,11 @@ export class ProductService {
     }
 
     await this.productRepository.updateProduct(productId, updateData);
+
     const updatedProduct: Product | null =
       await this.productRepository.findProductById(productId);
+
+    await this.invalidateCachedProductsVersion();
 
     return {
       message: 'Product updated successfully.',
@@ -350,6 +403,17 @@ export class ProductService {
       normalizedLimit,
     }: { normalizedPage: number; normalizedLimit: number } =
       normalizePagination(page, limit);
+
+    const version: string = await this.getProductCachedVersion();
+    const cacheKey: string = `products:vendor:v:${version}:${JSON.stringify({
+      page: normalizedPage,
+      limit: normalizedLimit,
+      search: search ?? '',
+      categoryId: categoryId ?? '',
+      status: status ?? '',
+    })}`;
+    const cachedProductsData = await this.cacheManager.get(cacheKey);
+    if (cachedProductsData) return cachedProductsData;
 
     const productBaseQuery = this.productRepository
       .createQueryBuilder('product')
@@ -423,6 +487,7 @@ export class ProductService {
             },
           };
 
+    await this.cacheManager.set(cacheKey, cachedProductsData, 10 * 1000);
     return result;
   }
 
@@ -433,6 +498,13 @@ export class ProductService {
     id: string;
     vendorId: string;
   }) {
+    const version: string = await this.getProductCachedVersion();
+    const cacheKey: string = `products:vendor:detail:v${version}:${id}`;
+    const cachedProductsData = await this.cacheManager.get(cacheKey);
+    if (cachedProductsData) {
+      return cachedProductsData;
+    }
+
     const product: Product | null =
       await this.productRepository.findProductByIdAndVendor(id, vendorId);
 
@@ -496,6 +568,11 @@ export class ProductService {
       })),
     };
 
+    await this.cacheManager.set(
+      cacheKey,
+      refinedProductResponseData,
+      10 * 1000,
+    );
     return refinedProductResponseData;
   }
 
@@ -527,6 +604,8 @@ export class ProductService {
       vendorId,
       slug,
     );
+
+    await this.invalidateCachedProductsVersion();
 
     return {
       message: 'Product created successfully.',
@@ -584,8 +663,11 @@ export class ProductService {
     }
 
     await this.productRepository.updateProduct(productId, updateData);
+
     const updatedProduct: Product | null =
       await this.productRepository.findProductById(productId);
+
+    await this.invalidateCachedProductsVersion();
 
     return {
       message: 'Product updated successfully.',
@@ -614,6 +696,8 @@ export class ProductService {
       throw new NotFoundException('Product not found.');
     }
 
+    await this.invalidateCachedProductsVersion();
+
     await this.productRepository.delete(productId);
     return {
       id: productId,
@@ -636,6 +720,7 @@ export class ProductService {
         productId,
         vendorId,
       );
+
     if (!product) {
       throw new NotFoundException('Product not found.');
     }
@@ -650,6 +735,8 @@ export class ProductService {
         variantAttributes: createProductVariantDto.variantAttributes,
         isDefault: createProductVariantDto.isDefault ?? false,
       });
+
+    await this.invalidateCachedProductsVersion();
 
     return {
       message: 'Variant created successfully.',
@@ -706,6 +793,8 @@ export class ProductService {
       throw new NotFoundException('Variant not found.');
     }
 
+    await this.invalidateCachedProductsVersion();
+
     return {
       message: 'Variant updated successfully.',
       id: updatedVariant.id,
@@ -742,6 +831,8 @@ export class ProductService {
     }
 
     await this.productVariantRepository.delete(variantId);
+
+    await this.invalidateCachedProductsVersion();
 
     return {
       id: variantId,
