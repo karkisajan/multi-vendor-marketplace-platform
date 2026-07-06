@@ -10,10 +10,15 @@ import { ProductService } from './services/product.service';
 import { VendorProductController } from './controllers/vendor-product.controller';
 import { AdminProductController } from './controllers/admin-product.controller';
 import { CategoryRepository } from '../categories/repositories/category.repository';
+import { CustomerProductController } from './controllers/customer-product.controller';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Product, ProductVariant, ProductImage])],
-  controllers: [VendorProductController, AdminProductController],
+  controllers: [
+    VendorProductController,
+    AdminProductController,
+    CustomerProductController,
+  ],
   providers: [
     ProductService,
     ProductRepository,

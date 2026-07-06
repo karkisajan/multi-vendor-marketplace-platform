@@ -22,7 +22,7 @@ import { normalizePagination } from 'src/common/utils/validate-pagination.util';
 import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { randomUUID } from 'crypto';
-
+import { ProductImage } from '../entities/product-image.entity';
 @Injectable()
 export class ProductService {
   constructor(
@@ -129,20 +129,22 @@ export class ProductService {
         .orderBy('product.createdAt', 'DESC')
         .getManyAndCount();
 
-    const refinedProductsResponseData = productsData.map((product) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      status: product.status,
-      vendorProfile: {
-        id: product.user.id,
-        businessName: product.user.vendorProfile.businessName,
-      },
-      category: {
-        id: product.category.id,
-        name: product.category.name,
-      },
-    }));
+    const refinedProductsResponseData = productsData.map(
+      (product: Product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        status: product.status,
+        vendorProfile: {
+          id: product.user.id,
+          businessName: product.user.vendorProfile.businessName,
+        },
+        category: {
+          id: product.category.id,
+          name: product.category.name,
+        },
+      }),
+    );
 
     const result =
       refinedProductsResponseData.length === 0
@@ -239,19 +241,23 @@ export class ProductService {
         id: productData?.category.id,
         name: productData?.category.name,
       },
-      productVariants: productData?.productVariants.map((productVariant) => ({
-        id: productVariant.id,
-        sellingPrice: productVariant.sellingPrice,
-        crossPrice: productVariant.crossPrice,
-        costPrice: productVariant.costPrice,
-        stockQuantity: productVariant.stockQuantity,
-        status: productVariant.status,
-        variantAttributes: productVariant.variantAttributes,
-        productImages: productVariant.productImages.map((productImage) => ({
-          id: productImage.id,
-          imageUrl: productImage.imageUrl,
-        })),
-      })),
+      productVariants: productData?.productVariants.map(
+        (productVariant: ProductVariant) => ({
+          id: productVariant.id,
+          sellingPrice: productVariant.sellingPrice,
+          crossPrice: productVariant.crossPrice,
+          costPrice: productVariant.costPrice,
+          stockQuantity: productVariant.stockQuantity,
+          status: productVariant.status,
+          variantAttributes: productVariant.variantAttributes,
+          productImages: productVariant.productImages.map(
+            (productImage: ProductImage) => ({
+              id: productImage.id,
+              imageUrl: productImage.imageUrl,
+            }),
+          ),
+        }),
+      ),
     };
 
     await this.cacheManager.set(
@@ -455,16 +461,18 @@ export class ProductService {
         .orderBy('product.createdAt', 'DESC')
         .getManyAndCount();
 
-    const refinedProductsResponseData = productsData.map((product) => ({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      status: product.status,
-      category: {
-        id: product.category.id,
-        name: product.category.name,
-      },
-    }));
+    const refinedProductsResponseData = productsData.map(
+      (product: Product) => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        status: product.status,
+        category: {
+          id: product.category.id,
+          name: product.category.name,
+        },
+      }),
+    );
 
     const result =
       refinedProductsResponseData.length === 0
@@ -553,19 +561,23 @@ export class ProductService {
         id: productData?.category.id,
         name: productData?.category.name,
       },
-      productVariants: productData?.productVariants.map((productVariant) => ({
-        id: productVariant.id,
-        sellingPrice: productVariant.sellingPrice,
-        crossPrice: productVariant.crossPrice,
-        costPrice: productVariant.costPrice,
-        stockQuantity: productVariant.stockQuantity,
-        status: productVariant.status,
-        variantAttributes: productVariant.variantAttributes,
-        productImages: productVariant.productImages.map((productImage) => ({
-          id: productImage.id,
-          imageUrl: productImage.imageUrl,
-        })),
-      })),
+      productVariants: productData?.productVariants.map(
+        (productVariant: ProductVariant) => ({
+          id: productVariant.id,
+          sellingPrice: productVariant.sellingPrice,
+          crossPrice: productVariant.crossPrice,
+          costPrice: productVariant.costPrice,
+          stockQuantity: productVariant.stockQuantity,
+          status: productVariant.status,
+          variantAttributes: productVariant.variantAttributes,
+          productImages: productVariant.productImages.map(
+            (productImage: ProductImage) => ({
+              id: productImage.id,
+              imageUrl: productImage.imageUrl,
+            }),
+          ),
+        }),
+      ),
     };
 
     await this.cacheManager.set(
@@ -839,6 +851,4 @@ export class ProductService {
       message: 'Variant deleted successfully.',
     };
   }
-
-  // ======================== CUSTOMER SPECIFIC SERVICES ========================
 }

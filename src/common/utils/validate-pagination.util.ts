@@ -6,8 +6,8 @@ export const normalizePagination = (
   page: number,
   limit: number,
 ): { normalizedPage: number; normalizedLimit: number } => {
-  const pageNumber = Number(page);
-  const limitNumber = Number(limit);
+  const pageNumber: number = Number(page);
+  const limitNumber: number = Number(limit);
 
   if (!Number.isInteger(pageNumber) || pageNumber <= 0) {
     throw new BadRequestException('Page must be a positive integer');
