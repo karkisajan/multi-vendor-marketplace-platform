@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -23,6 +24,11 @@ import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { randomUUID } from 'crypto';
 import { ProductImage } from '../entities/product-image.entity';
+import {
+  decodeCursor,
+  encodeCursor,
+} from 'src/common/utils/cursor-pagination.util';
+
 @Injectable()
 export class ProductService {
   constructor(
@@ -850,5 +856,159 @@ export class ProductService {
       id: variantId,
       message: 'Variant deleted successfully.',
     };
+  }
+
+  // ========================= CUSTOMER SPECIFIC METHODS =========================
+  async getAllProductsCustomer({
+    limit,
+    cursor,
+    search,
+    maxPrice,
+    minPrice,
+  }: {
+    limit: number;
+    cursor?: string;
+    search?: string;
+    maxPrice?: number;
+    minPrice?: number;
+  }) {
+    if (isNaN(Number(limit)) || limit <= 0) {
+      throw new BadRequestException('Limit should be of positive integer.');
+    }
+    const normalizedLimit: number = Math.min(100, limit);
+
+    const productBaseQuery = this.productRepository
+      .createQueryBuilder('product')
+      .leftJoin(
+        'product.productVariants',
+        'productVariant',
+        'productVariant.isDefault = :isDefault',
+        { isDefault: true },
+      )
+      .leftJoin(
+        'productVariant.productImages',
+        'productImage',
+        'productImage.isPrimary = :isPrimary',
+        { isPrimary: true },
+      )
+      .leftJoin('product.category', 'category')
+      .select([
+        'product.id',
+        'product.name',
+        'product.description',
+        'product.slug',
+        'product.createdAt',
+        'productVariant.id',
+        'productVariant.sellingPrice',
+        'productVariant.crossPrice',
+        'productVariant.stockQuantity',
+        'productVariant.variantAttributes',
+        'productImage.id',
+        'productImage.imageUrl',
+        'category.id',
+        'category.name',
+      ]);
+
+    if (search?.trim()) {
+      productBaseQuery.andWhere(
+        '(product.name ILIKE :search OR product.description ILIKE :search OR category.name ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      if (minPrice !== undefined && maxPrice !== undefined) {
+        productBaseQuery.andWhere(
+          'productVariant.sellingPrice BETWEEN :minPrice AND :maxPrice',
+          { minPrice: minPrice, maxPrice: maxPrice },
+        );
+      } else if (minPrice !== undefined) {
+        productBaseQuery.andWhere('productVariant.sellingPrice >= :minPrice', {
+          minPrice: minPrice,
+        });
+      } else if (maxPrice !== undefined) {
+        productBaseQuery.andWhere('productVariant.sellingPrice <= :maxPrice', {
+          maxPrice: maxPrice,
+        });
+      }
+    }
+
+    if (cursor) {
+      const { createdAt, id }: { createdAt: string; id: string } =
+        decodeCursor(cursor);
+      productBaseQuery.andWhere(
+        '(product.createdAt, product.id) < (:cursorCreatedAt, :cursorId)',
+        { cursorCreatedAt: createdAt, cursorId: id },
+      );
+    }
+
+    const productsData: Product[] = await productBaseQuery
+      .andWhere('product.status = :status', {
+        status: ProductStatusEnum.PUBLISHED,
+      })
+      .orderBy('product.createdAt', 'DESC')
+      .addOrderBy('product.id', 'DESC')
+      .take(normalizedLimit + 1)
+      .getMany();
+
+    const hasNextPage: boolean = productsData.length > normalizedLimit;
+    const paginatedProductsData: Product[] = hasNextPage
+      ? productsData.slice(0, normalizedLimit)
+      : productsData;
+
+    const lastProductOfPaginatedData: Product =
+      paginatedProductsData[paginatedProductsData.length - 1];
+
+    const nextPageCursor: string | null = hasNextPage
+      ? encodeCursor(
+          lastProductOfPaginatedData.createdAt,
+          lastProductOfPaginatedData.id,
+        )
+      : null;
+
+    const refinedProductsResponseData = paginatedProductsData.map(
+      (product: Product) => {
+        const productVariant: ProductVariant = product.productVariants[0];
+        const productImage: ProductImage = productVariant?.productImages[0];
+
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          description: product.description,
+          createdAt: product.createdAt,
+          productVariant: productVariant
+            ? {
+                id: productVariant.id,
+                sellingPrice: productVariant.sellingPrice,
+                crossPrice: productVariant.crossPrice,
+                stockQuantity: productVariant.stockQuantity,
+                variantAttributes: productVariant.variantAttributes,
+                productImage: productImage
+                  ? {
+                      id: productImage.id,
+                      imageUrl: productImage.imageUrl,
+                    }
+                  : null,
+              }
+            : null,
+
+          category: {
+            id: product.category.id,
+            name: product.category.name,
+          },
+        };
+      },
+    );
+
+    const result = {
+      data: refinedProductsResponseData,
+      meta: {
+        hasNextPage: hasNextPage,
+        nextPageCursor: nextPageCursor,
+      },
+    };
+
+    return result;
   }
 }
