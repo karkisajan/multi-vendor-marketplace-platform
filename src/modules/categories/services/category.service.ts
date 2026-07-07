@@ -175,7 +175,7 @@ export class CategoryService {
       normalizePagination(page, limit);
 
     const version: string = await this.getCachedCategoryVersion();
-    const cacheKey: string = `categories:v${version}:parent:page=${page}:limit=${normalizedLimit}`;
+    const cacheKey: string = `categories:v${version}:parent:${JSON.stringify({ page: normalizedPage, limit: normalizedLimit })}`;
     const cachedData = await this.cacheManager.get(cacheKey);
     if (cachedData) {
       return cachedData;

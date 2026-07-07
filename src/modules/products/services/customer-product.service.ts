@@ -316,6 +316,11 @@ export class CustomerProductService {
    * can suggest related inventory to the customer.
    */
   async getSimilarProducts(slug: string) {
+    const cacheVersion: string = await this.getProductCachedVersion();
+    const cacheKey: string = `products:customer:v:${cacheVersion}:${JSON.stringify({ slug: slug })}`;
+    const cachedProductData = await this.cacheManager.get(cacheKey);
+    if (cachedProductData) return cachedProductData;
+
     const product: Product | null =
       await this.productRepository.findProductBySlug(slug);
 
@@ -405,6 +410,7 @@ export class CustomerProductService {
             data: refinedProductResponseData,
           };
 
+    await this.cacheManager.set(cacheKey, result, 10 * 1000);
     return result;
   }
 }
