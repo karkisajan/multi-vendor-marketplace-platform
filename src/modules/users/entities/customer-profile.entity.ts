@@ -2,10 +2,12 @@ import {
   Column,
   Entity,
   JoinColumn,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { User } from './user.entity';
+import { Bookmark } from 'src/modules/bookmarks/entities/bookmark.entity';
 
 @Entity({ name: 'customer_profiles' })
 export class CustomerProfile {
@@ -30,4 +32,7 @@ export class CustomerProfile {
   @OneToOne(() => User, (user) => user.customerProfile, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @OneToMany(() => Bookmark, (bookmark) => bookmark.customer)
+  bookmarks: Bookmark[];
 }

@@ -3,12 +3,14 @@ import {
   CreateDateColumn,
   Entity,
   JoinColumn,
+  OneToMany,
   OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { User } from './user.entity';
 import { VendorStatusEnum } from 'src/common/enums/vendor-status.enum';
+import { Bookmark } from 'src/modules/bookmarks/entities/bookmark.entity';
 
 @Entity({ name: 'vendor_profiles' })
 export class VendorProfile {
@@ -49,4 +51,7 @@ export class VendorProfile {
   @OneToOne(() => User, (user) => user.vendorProfile, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'user_id' })
   user: User;
+
+  @OneToMany(() => Bookmark, (bookmark) => bookmark.vendorProfile)
+  bookmarks: Bookmark[];
 }

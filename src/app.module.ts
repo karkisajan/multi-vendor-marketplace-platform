@@ -22,6 +22,7 @@ import Keyv from 'keyv';
 import { ThrottlerModule } from '@nestjs/throttler';
 import Redis from 'ioredis';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { BookmarksModule } from './modules/bookmarks/bookmarks.module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis'
     OrdersModule,
     AuditLogsModule,
     RedisModule,
+    BookmarksModule,
   ],
   providers: [
     {
@@ -97,6 +99,6 @@ export class AppModule implements NestModule {
     consumer
       .apply(AuthenticationMiddleware)
       .exclude('/auth')
-      .forRoutes('/users', '/vendor');
+      .forRoutes('/users', '/vendor', '/customers/bookmarks');
   }
 }

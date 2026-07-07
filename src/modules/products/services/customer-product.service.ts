@@ -31,6 +31,11 @@ export class CustomerProductService {
     return String(version);
   }
 
+  /**
+   * ------ GET - Fetch all products (Customer)
+   * Builds the public product listing with cursor pagination, search filtering,
+   * and cache-backed responses for faster storefront browsing.
+   */
   async getAllProductsCustomer({
     limit,
     cursor,
@@ -211,6 +216,11 @@ export class CustomerProductService {
     return result;
   }
 
+  /**
+   * ------ GET - Fetch product by slug (Customer)
+   * Returns the public product detail payload for a published product and throws
+   * NotFoundException when the slug does not resolve to an available product.
+   */
   async getProductBySlug(slug: string) {
     const product: Product | null =
       await this.productRepository.findProductBySlug(slug);
@@ -284,6 +294,11 @@ export class CustomerProductService {
     return refinedProductResponseData;
   }
 
+  /**
+   * ------ GET - Fetch similar products (Customer)
+   * Returns products from the same category as the requested item so the storefront
+   * can suggest related inventory to the customer.
+   */
   async getSimilarProducts(slug: string) {
     const product: Product | null =
       await this.productRepository.findProductBySlug(slug);

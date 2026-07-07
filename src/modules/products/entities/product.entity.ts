@@ -13,6 +13,7 @@ import {
 } from 'typeorm';
 import { ProductVariant } from './product-variant.entity';
 import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
+import { Bookmark } from 'src/modules/bookmarks/entities/bookmark.entity';
 
 @Entity({ name: 'products' })
 export class Product {
@@ -61,6 +62,9 @@ export class Product {
     cascade: true,
   })
   productVariants: ProductVariant[];
+
+  @OneToMany(() => Bookmark, (bookmark) => bookmark.product)
+  bookmarks: Bookmark[];
 
   @CreateDateColumn()
   createdAt: Date;
