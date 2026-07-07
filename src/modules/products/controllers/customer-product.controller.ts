@@ -1,9 +1,11 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ProductService } from '../services/product.service';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { CustomerProductService } from '../services/customer-product.service';
 
 @Controller('/customers/products')
 export class CustomerProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(
+    private readonly CustomerProductService: CustomerProductService,
+  ) {}
 
   @Get('/')
   async getAllProductsCustomer(
@@ -13,12 +15,22 @@ export class CustomerProductController {
     @Query('maxPrice') maxPrice?: number,
     @Query('minPrice') minPrice?: number,
   ) {
-    return await this.productService.getAllProductsCustomer({
+    return await this.CustomerProductService.getAllProductsCustomer({
       limit: limit,
       cursor: cursor,
       search: search,
       maxPrice: maxPrice,
       minPrice: minPrice,
     });
+  }
+
+  @Get('/:slug')
+  async getProductBySlug(@Param('slug') slug: string) {
+    return await this.CustomerProductService.getProductBySlug(slug);
+  }
+
+  @Get('/similar-products/:slug')
+  async getSimilarProducts(@Param('slug') slug: string) {
+    return await this.CustomerProductService.getSimilarProducts(slug);
   }
 }

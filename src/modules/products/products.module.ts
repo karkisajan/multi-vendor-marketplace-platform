@@ -11,6 +11,7 @@ import { VendorProductController } from './controllers/vendor-product.controller
 import { AdminProductController } from './controllers/admin-product.controller';
 import { CategoryRepository } from '../categories/repositories/category.repository';
 import { CustomerProductController } from './controllers/customer-product.controller';
+import { CustomerProductService } from './services/customer-product.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Product, ProductVariant, ProductImage])],
@@ -21,6 +22,7 @@ import { CustomerProductController } from './controllers/customer-product.contro
   ],
   providers: [
     ProductService,
+    CustomerProductService,
     ProductRepository,
     ProductVariantRepository,
     ProductImageRepository,
