@@ -108,7 +108,8 @@ export class ProductService {
 
     if (search?.trim()) {
       productBaseQuery.andWhere(
-        `(product.name ILIKE :search OR vendorProfile.businessName ILIKE :search)`,
+        `(product.name ILIKE :search OR product.description ILIKE :search 
+          OR vendorProfile.businessName ILIKE :search)`,
         { search: `%${search}%` },
       );
     }
@@ -150,6 +151,7 @@ export class ProductService {
     const result =
       refinedProductsResponseData.length === 0
         ? {
+            message: 'No products found',
             data: [],
             meta: {
               page: normalizedPage,
@@ -159,6 +161,7 @@ export class ProductService {
             },
           }
         : {
+            message: 'Products fetched successfully.',
             data: refinedProductsResponseData,
             meta: {
               page: normalizedPage,
@@ -183,13 +186,6 @@ export class ProductService {
     const cachedProductsData = await this.cacheManager.get(cacheKey);
     if (cachedProductsData) {
       return cachedProductsData;
-    }
-
-    const product: Product | null =
-      await this.productRepository.findProductById(id);
-
-    if (!product) {
-      throw new NotFoundException('Product not found.');
     }
 
     const productBaseQuery = this.productRepository
@@ -225,7 +221,15 @@ export class ProductService {
         'vendorProfile.businessProfileUrl',
       ]);
 
-    const productData: Product | null = await productBaseQuery.getOne();
+    const productData: Product | null = await productBaseQuery
+      .where('product.id = :id', { id: id })
+      .orderBy('productVariant.isDefault', 'DESC')
+      .addOrderBy('productImage.isPrimary', 'DESC')
+      .getOne();
+
+    if (!productData) {
+      throw new NotFoundException('Product not found.');
+    }
 
     const refinedProductResponseData = {
       id: productData?.id,
@@ -266,7 +270,11 @@ export class ProductService {
       refinedProductResponseData,
       10 * 1000,
     );
-    return refinedProductResponseData;
+
+    return {
+      message: 'Product fetched successfully.',
+      data: refinedProductResponseData,
+    };
   }
 
   /**
@@ -437,7 +445,8 @@ export class ProductService {
 
     if (search?.trim()) {
       productBaseQuery.andWhere(
-        `(product.name ILIKE :search OR product.description ILIKE :search)`,
+        `(product.name ILIKE :search OR product.description ILIKE :search OR
+          category.name ILIKE :search)`,
         {
           search: `%${search}%`,
         },
@@ -514,13 +523,6 @@ export class ProductService {
       return cachedProductsData;
     }
 
-    const product: Product | null =
-      await this.productRepository.findProductByIdAndVendor(id, vendorId);
-
-    if (!product) {
-      throw new NotFoundException('Product not found.');
-    }
-
     const productBaseQuery = this.productRepository
       .createQueryBuilder('product')
       .leftJoin('product.productVariants', 'productVariant')
@@ -549,8 +551,15 @@ export class ProductService {
       ]);
 
     const productData: Product | null = await productBaseQuery
-      .where('product.vendorId = :vendorId', { vendorId: vendorId })
+      .where('product.id = :id', { id: id })
+      .andWhere('product.vendorId = :vendorId', { vendorId: vendorId })
+      .orderBy('productVariant.isDefault', 'DESC')
+      .addOrderBy('productImage.isPrimary', 'DESC')
       .getOne();
+
+    if (!productData) {
+      throw new NotFoundException('Product not found.');
+    }
 
     const refinedProductResponseData = {
       id: productData?.id,
@@ -586,6 +595,7 @@ export class ProductService {
       refinedProductResponseData,
       10 * 1000,
     );
+
     return refinedProductResponseData;
   }
 

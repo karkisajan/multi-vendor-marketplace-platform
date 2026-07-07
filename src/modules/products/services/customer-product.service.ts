@@ -64,6 +64,7 @@ export class CustomerProductService {
         minPrice: minPrice,
       },
     )}`;
+
     const cachedProductsData = await this.cacheManager.get(cacheKey);
     if (cachedProductsData) return cachedProductsData;
 
@@ -101,7 +102,8 @@ export class CustomerProductService {
 
     if (search?.trim()) {
       productBaseQuery.andWhere(
-        '(product.name ILIKE :search OR product.description ILIKE :search OR category.name ILIKE :search)',
+        `(product.name ILIKE :search OR product.description ILIKE :search OR 
+          category.name ILIKE :search)`,
         { search: `%${search}%` },
       );
     }
@@ -222,12 +224,10 @@ export class CustomerProductService {
    * NotFoundException when the slug does not resolve to an available product.
    */
   async getProductBySlug(slug: string) {
-    const product: Product | null =
-      await this.productRepository.findProductBySlug(slug);
-
-    if (!product) {
-      throw new NotFoundException('Product not found.');
-    }
+    const cacheVersion: string = await this.getProductCachedVersion();
+    const cacheKey: string = `products:customer:v${cacheVersion}:${JSON.stringify({ slug: slug })}`;
+    const cachedProductData = await this.cacheManager.get(cacheKey);
+    if (cachedProductData) return cachedProductData;
 
     const productBaseQuery = this.productRepository
       .createQueryBuilder('product')
@@ -258,10 +258,17 @@ export class CustomerProductService {
       ]);
 
     const productData: Product | null = await productBaseQuery
+      .where('product.slug = :slug', { slug: slug })
       .andWhere('product.status = :status', {
         status: ProductStatusEnum.PUBLISHED,
       })
+      .orderBy('productVariant.isDefault', 'DESC')
+      .addOrderBy('productImage.isPrimary', 'DESC')
       .getOne();
+
+    if (!productData) {
+      throw new NotFoundException('Product not found.');
+    }
 
     const refinedProductResponseData = {
       id: productData?.id,
@@ -291,7 +298,16 @@ export class CustomerProductService {
       },
     };
 
-    return refinedProductResponseData;
+    await this.cacheManager.set(
+      cacheKey,
+      refinedProductResponseData,
+      10 * 1000,
+    );
+
+    return {
+      message: 'Product fetched successfully.',
+      data: refinedProductResponseData,
+    };
   }
 
   /**
@@ -350,15 +366,43 @@ export class CustomerProductService {
       .orderBy('product.createdAt', 'DESC')
       .getMany();
 
+    const refinedProductResponseData = productsData.map((product) => {
+      const productVariant: ProductVariant = product.productVariants[0];
+      const productImage: ProductImage = productVariant?.productImages[0];
+
+      return {
+        id: product.id,
+        name: product.name,
+        slug: product.slug,
+        description: product.description,
+        createdAt: product.createdAt,
+        productVariant: productVariant
+          ? {
+              id: productVariant.id,
+              sellingPrice: productVariant.sellingPrice,
+              crossPrice: productVariant.crossPrice,
+              stockQuantity: productVariant.stockQuantity,
+              variantAttributes: productVariant.variantAttributes,
+              productImage: productImage
+                ? {
+                    id: productImage.id,
+                    imageUrl: productImage.imageUrl,
+                  }
+                : null,
+            }
+          : null,
+      };
+    });
+
     const result =
-      productsData.length === 0
+      refinedProductResponseData.length === 0
         ? {
             message: 'No similar Products found for this product.',
             data: [],
           }
         : {
             message: 'Similar products fetched successfully.',
-            data: productsData,
+            data: refinedProductResponseData,
           };
 
     return result;
