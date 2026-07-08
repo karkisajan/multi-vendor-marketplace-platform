@@ -5,7 +5,10 @@ import { Product } from 'src/modules/products/entities/product.entity';
 import { ProductVariant } from 'src/modules/products/entities/product-variant.entity';
 import { ProductImage } from 'src/modules/products/entities/product-image.entity';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
-import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
+import {
+  ProductStatusEnum,
+  VariantStatusEnum,
+} from 'src/common/enums/product-status.enum';
 import { generateSlug } from 'src/common/utils/generate-slug.util';
 
 const SAMPLE_IMAGES = [
@@ -88,6 +91,61 @@ function getRandomNumber(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+interface VendorProductPlan {
+  vendor: User;
+  products: Product[];
+}
+
+function buildInterleavedProducts(vendorPlans: VendorProductPlan[]): Product[] {
+  const mixedProducts: Product[] = [];
+  const vendorQueues = vendorPlans.map(({ products }) => ({
+    queue: [...products],
+  }));
+
+  let hasRemainingProducts = true;
+  while (hasRemainingProducts) {
+    hasRemainingProducts = false;
+
+    for (const vendorQueue of vendorQueues) {
+      const nextProduct = vendorQueue.queue.shift();
+      if (!nextProduct) {
+        continue;
+      }
+
+      hasRemainingProducts = true;
+      mixedProducts.push(nextProduct);
+    }
+  }
+
+  return mixedProducts;
+}
+
+function seedProductTimestamps(products: Product[]): void {
+  const baseTimestamp = Date.now() - products.length * 60_000;
+
+  products.forEach((product, index) => {
+    const timestamp = new Date(baseTimestamp + index * 60_000);
+    product.createdAt = timestamp;
+    product.updatedAt = timestamp;
+
+    product.productVariants?.forEach((variant, variantIndex) => {
+      const variantTimestamp = new Date(
+        timestamp.getTime() + variantIndex * 5_000,
+      );
+      variant.createdAt = variantTimestamp;
+      variant.updatedAt = variantTimestamp;
+
+      // variant.productImages?.forEach((image, imageIndex) => {
+      //   const imageTimestamp = new Date(
+      //     variantTimestamp.getTime() + imageIndex * 1_000,
+      //   );
+      //   image.createdAt = imageTimestamp;
+      //   image.updatedAt = imageTimestamp;
+      // });
+    });
+  });
+}
+
 async function seedProducts(): Promise<void> {
   await dataSource.initialize();
   const manager = dataSource.manager;
@@ -113,6 +171,8 @@ async function seedProducts(): Promise<void> {
   console.log(
     `Found ${vendors.length} vendors and ${categories.length} categories.`,
   );
+
+  const vendorPlans: VendorProductPlan[] = [];
 
   for (let v = 0; v < vendors.length; v++) {
     const vendor = vendors[v];
@@ -153,7 +213,11 @@ async function seedProducts(): Promise<void> {
         variant.sellingPrice = basePrice;
         variant.crossPrice = Number((basePrice * 1.25).toFixed(2));
         variant.costPrice = Number((basePrice * 0.6).toFixed(2));
-        variant.stockQuantity = getRandomNumber(10, 200);
+        const isInStock = Math.random() > 0.18;
+        variant.stockQuantity = isInStock ? getRandomNumber(10, 200) : 0;
+        variant.status = isInStock
+          ? VariantStatusEnum.IN_STOCK
+          : VariantStatusEnum.OUT_OF_STOCK;
         variant.isDefault = varIdx === defaultVariantIndex;
 
         // Attributes
@@ -183,14 +247,20 @@ async function seedProducts(): Promise<void> {
       products.push(product);
     }
 
-    // Save in chunks of 50 to avoid memory/transaction issues
-    const chunkSize = 50;
-    for (let i = 0; i < products.length; i += chunkSize) {
-      const chunk = products.slice(i, i + chunkSize);
-      await manager.save(Product, chunk);
-    }
+    vendorPlans.push({ vendor, products });
+  }
 
-    console.log(`Successfully seeded products for vendor: ${vendor.email}`);
+  const mixedProducts: Product[] = buildInterleavedProducts(vendorPlans);
+  seedProductTimestamps(mixedProducts);
+
+  // Save in chunks of 50 to avoid memory/transaction issues
+  console.log(
+    `Saving ${mixedProducts.length} mixed products in interleaved vendor order...`,
+  );
+  const chunkSize = 50;
+  for (let i = 0; i < mixedProducts.length; i += chunkSize) {
+    const chunk = mixedProducts.slice(i, i + chunkSize);
+    await manager.save(Product, chunk);
   }
 
   console.log('Seeding products, variants, and images completed successfully!');
