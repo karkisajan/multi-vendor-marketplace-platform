@@ -46,8 +46,8 @@ export class CustomerProductService {
     limit: number;
     cursor?: string;
     search?: string;
-    maxPrice?: number;
-    minPrice?: number;
+    maxPrice?: string | number;
+    minPrice?: string | number;
   }) {
     if (isNaN(Number(limit)) || limit <= 0) {
       throw new BadRequestException('Limit should be of positive integer.');
@@ -108,7 +108,6 @@ export class CustomerProductService {
       );
     }
 
-    /*[ ----- Issues on this filter logic (To be fixed)]
     if (minPrice !== undefined || maxPrice !== undefined) {
       if (minPrice !== undefined && maxPrice !== undefined) {
         productBaseQuery.andWhere(
@@ -125,7 +124,6 @@ export class CustomerProductService {
         });
       }
     }
-    */
 
     if (cursor) {
       const { createdAt, id }: { createdAt: string; id: string } =
