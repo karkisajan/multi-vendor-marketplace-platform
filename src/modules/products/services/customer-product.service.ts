@@ -65,7 +65,6 @@ export class CustomerProductService {
 
     const cachedProductsData = await this.cacheManager.get(cacheKey);
     if (cachedProductsData) {
-      console.log('Returning from cached data.');
       return cachedProductsData;
     }
 
@@ -136,6 +135,7 @@ export class CustomerProductService {
     if (cursor) {
       const { createdAt, id }: { createdAt: string; id: string } =
         decodeCursor(cursor);
+
       productBaseQuery.andWhere(
         '(product.createdAt, product.id) < (:cursorCreatedAt, :cursorId)',
         { cursorCreatedAt: createdAt, cursorId: id },
