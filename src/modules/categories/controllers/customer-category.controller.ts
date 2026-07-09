@@ -7,7 +7,7 @@ import {
 } from '../decorators/category-swagger.decorator';
 
 @ApiTags('Customer Categories')
-@Controller('customer/categories')
+@Controller('/categories')
 export class CustomerCategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 

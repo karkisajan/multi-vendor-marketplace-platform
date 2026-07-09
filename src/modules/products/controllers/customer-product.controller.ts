@@ -9,7 +9,7 @@ import {
 import { DatePostedTypeEnum } from 'src/common/enums/date-filters.enum';
 
 @ApiTags('Customer Products')
-@Controller('/customers/products')
+@Controller('/products')
 export class CustomerProductController {
   constructor(
     private readonly CustomerProductService: CustomerProductService,
