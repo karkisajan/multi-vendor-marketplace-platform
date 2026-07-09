@@ -6,6 +6,7 @@ import {
   ApiCustomerGetProductBySlug,
   ApiCustomerGetSimilarProducts,
 } from '../decorators/customer-product-swagger.decorator';
+import { DatePostedTypeEnum } from 'src/common/enums/date-filters.enum';
 
 @ApiTags('Customer Products')
 @Controller('/customers/products')
@@ -25,15 +26,13 @@ export class CustomerProductController {
     @Query('limit') limit: number,
     @Query('cursor') cursor?: string,
     @Query('search') search?: string,
-    @Query('maxPrice') maxPrice?: number,
-    @Query('minPrice') minPrice?: number,
+    @Query('datePosted') datePosted?: DatePostedTypeEnum,
   ) {
     return await this.CustomerProductService.getAllProductsCustomer({
       limit: limit,
       cursor: cursor,
       search: search,
-      maxPrice: maxPrice,
-      minPrice: minPrice,
+      datePosted: datePosted,
     });
   }
 

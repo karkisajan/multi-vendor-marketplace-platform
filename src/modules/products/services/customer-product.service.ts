@@ -14,6 +14,7 @@ import {
   decodeCursor,
   encodeCursor,
 } from 'src/common/utils/cursor-pagination.util';
+import { DatePostedTypeEnum } from 'src/common/enums/date-filters.enum';
 
 @Injectable()
 export class CustomerProductService {
@@ -40,14 +41,12 @@ export class CustomerProductService {
     limit,
     cursor,
     search,
-    maxPrice,
-    minPrice,
+    datePosted,
   }: {
     limit: number;
     cursor?: string;
     search?: string;
-    maxPrice?: string | number;
-    minPrice?: string | number;
+    datePosted?: DatePostedTypeEnum;
   }) {
     if (isNaN(Number(limit)) || limit <= 0) {
       throw new BadRequestException('Limit should be of positive integer.');
@@ -60,13 +59,15 @@ export class CustomerProductService {
         limit: limit,
         cursor: cursor,
         search: search,
-        maxPrice: maxPrice,
-        minPrice: minPrice,
+        datePosted: datePosted,
       },
     )}`;
 
     const cachedProductsData = await this.cacheManager.get(cacheKey);
-    if (cachedProductsData) return cachedProductsData;
+    if (cachedProductsData) {
+      console.log('Returning from cached data.');
+      return cachedProductsData;
+    }
 
     const productBaseQuery = this.productRepository
       .createQueryBuilder('product')
@@ -108,21 +109,28 @@ export class CustomerProductService {
       );
     }
 
-    if (minPrice !== undefined || maxPrice !== undefined) {
-      if (minPrice !== undefined && maxPrice !== undefined) {
-        productBaseQuery.andWhere(
-          'productVariant.sellingPrice BETWEEN :minPrice AND :maxPrice',
-          { minPrice: minPrice, maxPrice: maxPrice },
-        );
-      } else if (minPrice !== undefined) {
-        productBaseQuery.andWhere('productVariant.sellingPrice >= :minPrice', {
-          minPrice: minPrice,
-        });
-      } else if (maxPrice !== undefined) {
-        productBaseQuery.andWhere('productVariant.sellingPrice <= :maxPrice', {
-          maxPrice: maxPrice,
-        });
+    /**
+     * Filter by datePosted (last 24 hours, 7 days, 15 days and 30 days)
+     */
+    if (datePosted && datePosted !== DatePostedTypeEnum.ANY_TIME) {
+      const mappedDays: Record<string, any> = {
+        [DatePostedTypeEnum.LAST_24_HOURS]: 1,
+        [DatePostedTypeEnum.LAST_7_DAYS]: 7,
+        [DatePostedTypeEnum.LAST_15_DAYS]: 15,
+        [DatePostedTypeEnum.LAST_30_DAYS]: 30,
+      };
+
+      const days = mappedDays[datePosted] as number;
+      if (!days) {
+        throw new BadRequestException('Invalid date posted value.');
       }
+
+      const daysSince: Date = new Date(Date.now());
+      daysSince.setDate(daysSince.getDate() - days);
+
+      productBaseQuery.andWhere('product.createdAt >= :daysSince', {
+        daysSince: daysSince,
+      });
     }
 
     if (cursor) {
