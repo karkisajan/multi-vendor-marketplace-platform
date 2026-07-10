@@ -168,8 +168,19 @@ async function seedProducts(): Promise<void> {
     return;
   }
 
+  // Filter to get only leaf categories (categories that are not parent to any other category)
+  const parentIds = new Set(
+    categories.map((c) => c.parentId).filter((id): id is string => !!id),
+  );
+  const leafCategories = categories.filter((c) => !parentIds.has(c.id));
+
+  if (leafCategories.length === 0) {
+    console.warn('No leaf categories found!');
+    return;
+  }
+
   console.log(
-    `Found ${vendors.length} vendors and ${categories.length} categories.`,
+    `Found ${vendors.length} vendors, ${categories.length} total categories, and ${leafCategories.length} leaf categories.`,
   );
 
   const vendorPlans: VendorProductPlan[] = [];
@@ -193,7 +204,7 @@ async function seedProducts(): Promise<void> {
 
       const product = new Product();
       product.vendorId = vendor.id;
-      product.categoryId = getRandomElement(categories).id;
+      product.categoryId = getRandomElement(leafCategories).id;
       product.name = productName;
       product.slug = slug;
       product.description = `Experience the best quality with our ${adjective.toLowerCase()} ${core.toLowerCase()}. Built with premium materials for maximum durability and satisfaction.`;

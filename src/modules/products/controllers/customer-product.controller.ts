@@ -26,12 +26,18 @@ export class CustomerProductController {
     @Query('limit') limit: number,
     @Query('cursor') cursor?: string,
     @Query('search') search?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('minPrice') minPrice?: number,
+    @Query('maxPrice') maxPrice?: number,
     @Query('datePosted') datePosted?: DatePostedTypeEnum,
   ) {
     return await this.CustomerProductService.getAllProductsCustomer({
       limit: limit,
       cursor: cursor,
       search: search,
+      categoryId: categoryId,
+      minPrice: minPrice,
+      maxPrice: maxPrice,
       datePosted: datePosted,
     });
   }

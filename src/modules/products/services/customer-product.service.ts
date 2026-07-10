@@ -41,11 +41,17 @@ export class CustomerProductService {
     limit,
     cursor,
     search,
+    categoryId,
+    minPrice,
+    maxPrice,
     datePosted,
   }: {
     limit: number;
     cursor?: string;
     search?: string;
+    categoryId?: string;
+    minPrice?: number;
+    maxPrice?: number;
     datePosted?: DatePostedTypeEnum;
   }) {
     if (isNaN(Number(limit)) || limit <= 0) {
@@ -59,6 +65,9 @@ export class CustomerProductService {
         limit: limit,
         cursor: cursor,
         search: search,
+        categoryId: categoryId,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
         datePosted: datePosted,
       },
     )}`;
@@ -106,6 +115,29 @@ export class CustomerProductService {
           category.name ILIKE :search)`,
         { search: `%${search}%` },
       );
+    }
+
+    if (categoryId) {
+      productBaseQuery.andWhere('product.categoryId = :categoryId', {
+        categoryId: categoryId,
+      });
+    }
+
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      if (minPrice !== undefined && maxPrice !== undefined) {
+        productBaseQuery.andWhere(
+          `(productVariant.sellingPrice BETWEEN :minPrice AND :maxPrice)`,
+          { minPrice: minPrice, maxPrice: maxPrice },
+        );
+      } else if (minPrice !== undefined) {
+        productBaseQuery.andWhere('productVariant.sellingPrice <= :minPrice', {
+          minPrice: minPrice,
+        });
+      } else if (maxPrice !== undefined) {
+        productBaseQuery.andWhere('productVariant.sellingPrice >= :maxPrice', {
+          maxPrice: maxPrice,
+        });
+      }
     }
 
     /**
