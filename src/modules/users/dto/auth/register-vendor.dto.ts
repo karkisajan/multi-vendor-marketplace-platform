@@ -15,7 +15,10 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class RegisterVendorDto {
   /* Legal or registered name of the business entity */
-  @ApiProperty({ example: 'Acme Corp', description: 'Registered business name of the vendor' })
+  @ApiProperty({
+    example: 'Acme Corp',
+    description: 'Registered business name of the vendor',
+  })
   @MinLength(3, { message: 'Business name should be of atleast 3 characters.' })
   @IsNotEmpty({ message: 'Business name is required.' })
   @IsString({ message: 'Business name must be a string.' })

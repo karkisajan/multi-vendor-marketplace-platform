@@ -11,6 +11,8 @@ import { CreateProductDto } from '../dto/vendor/create-product.dto';
 import { UpdateProductDto } from '../dto/vendor/update-product.dto';
 import { CreateProductVariantDto } from '../dto/vendor/create-product-variant.dto';
 import { UpdateProductVariantDto } from '../dto/vendor/update-product-variant.dto';
+import { CreateProductSpecificationDto } from '../dto/vendor/create-product-specification.dto';
+import { UpdateProductSpecificationDto } from '../dto/vendor/update-product-specification.dto';
 import { UpdateProductStatusDto } from '../dto/admin/update-product-status.dto';
 import { AdminUpdateProductDto } from '../dto/admin/admin-update-product.dto';
 import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
@@ -397,5 +399,158 @@ export function ApiAdminGetProductById() {
       description: 'Forbidden. Admin role required.',
     }),
     ApiResponse({ status: 404, description: 'Product not found.' }),
+  );
+}
+
+// ───────────────────────────── VENDOR PRODUCT SPECIFICATION ─────────────────────────────
+
+/**
+ * Swagger documentation decorator for adding a specification to a product.
+ */
+export function ApiVendorCreateSpecification() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Add a specification key-value pair to a product (Vendor only)',
+    }),
+    ApiParam({
+      name: 'productId',
+      type: String,
+      description: 'The unique identifier of the product',
+    }),
+    ApiBody({ type: CreateProductSpecificationDto }),
+    ApiResponse({
+      status: 201,
+      description: 'Specification created successfully.',
+    }),
+    ApiResponse({ status: 400, description: 'Validation failed.' }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized. Invalid or missing JWT.',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Product not found or not owned by this vendor.',
+    }),
+  );
+}
+
+/**
+ * Swagger documentation decorator for fetching specifications of a product.
+ */
+export function ApiVendorGetSpecifications() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary:
+        'Get all specifications for a specific owned product (Vendor only)',
+    }),
+    ApiParam({
+      name: 'productId',
+      type: String,
+      description: 'The unique identifier of the product',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Specifications retrieved successfully.',
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized. Invalid or missing JWT.',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Product not found or not owned by this vendor.',
+    }),
+  );
+}
+
+/**
+ * Swagger documentation decorator for getting a specification by ID.
+ */
+export function ApiVendorGetSpecificationById() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Get a single owned specification by ID (Vendor only)',
+    }),
+    ApiParam({
+      name: 'specId',
+      type: String,
+      description: 'The unique identifier of the specification',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Specification retrieved successfully.',
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized. Invalid or missing JWT.',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Specification not found.',
+    }),
+  );
+}
+
+/**
+ * Swagger documentation decorator for updating a specification.
+ */
+export function ApiVendorUpdateSpecification() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary:
+        'Update an owned specification key, value, or sort order (Vendor only)',
+    }),
+    ApiParam({
+      name: 'specId',
+      type: String,
+      description: 'The unique identifier of the specification',
+    }),
+    ApiBody({ type: UpdateProductSpecificationDto }),
+    ApiResponse({
+      status: 200,
+      description: 'Specification updated successfully.',
+    }),
+    ApiResponse({ status: 400, description: 'Validation failed.' }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized. Invalid or missing JWT.',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Specification not found or not owned by this vendor.',
+    }),
+  );
+}
+
+/**
+ * Swagger documentation decorator for deleting a specification.
+ */
+export function ApiVendorDeleteSpecification() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({
+      summary: 'Delete an owned specification (Vendor only)',
+    }),
+    ApiParam({
+      name: 'specId',
+      type: String,
+      description: 'The unique identifier of the specification',
+    }),
+    ApiResponse({
+      status: 200,
+      description: 'Specification deleted successfully.',
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Unauthorized. Invalid or missing JWT.',
+    }),
+    ApiResponse({
+      status: 404,
+      description: 'Specification not found or not owned by this vendor.',
+    }),
   );
 }

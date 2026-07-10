@@ -271,6 +271,7 @@ export class CustomerProductService {
       .createQueryBuilder('product')
       .leftJoin('product.productVariants', 'productVariant')
       .leftJoin('productVariant.productImages', 'productImage')
+      .leftJoin('product.productSpecifications', 'productSpecification')
       .leftJoin('product.category', 'category')
       .leftJoin('product.user', 'vendor')
       .leftJoin('vendor.vendorProfile', 'vendorProfile')
@@ -287,6 +288,9 @@ export class CustomerProductService {
         'productVariant.variantAttributes',
         'productImage.id',
         'productImage.imageUrl',
+        'productSpecification.id',
+        'productSpecification.key',
+        'productSpecification.value',
         'category.id',
         'category.name',
         'vendor.id',
@@ -302,6 +306,7 @@ export class CustomerProductService {
       })
       .orderBy('productVariant.isDefault', 'DESC')
       .addOrderBy('productImage.isPrimary', 'DESC')
+      .addOrderBy('productSpecification.sortOrder', 'ASC')
       .getOne();
 
     if (!productData) {
@@ -324,6 +329,13 @@ export class CustomerProductService {
           imageUrl: productImage.imageUrl,
         })),
       })),
+      productSpecifications: productData.productSpecifications.map(
+        (productSpecification) => ({
+          id: productSpecification.id,
+          key: productSpecification.key,
+          value: productSpecification.value,
+        }),
+      ),
       vendorProfile: {
         id: productData?.user.id,
         email: productData?.user.email,

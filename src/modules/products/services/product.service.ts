@@ -6,14 +6,18 @@ import {
 } from '@nestjs/common';
 import { ProductRepository } from '../repositories/product.repository';
 import { ProductVariantRepository } from '../repositories/product-variant.repository';
+import { ProductSpecificationRepository } from '../repositories/product-specification.repository';
 import { CreateProductDto } from '../dto/vendor/create-product.dto';
 import { UpdateProductDto } from '../dto/vendor/update-product.dto';
 import { CreateProductVariantDto } from '../dto/vendor/create-product-variant.dto';
 import { UpdateProductVariantDto } from '../dto/vendor/update-product-variant.dto';
+import { CreateProductSpecificationDto } from '../dto/vendor/create-product-specification.dto';
+import { UpdateProductSpecificationDto } from '../dto/vendor/update-product-specification.dto';
 import { UpdateProductStatusDto } from '../dto/admin/update-product-status.dto';
 import { AdminUpdateProductDto } from '../dto/admin/admin-update-product.dto';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
+import { ProductSpecification } from '../entities/product-specification.entity';
 import { generateSlug } from 'src/common/utils/generate-slug.util';
 import { CategoryRepository } from 'src/modules/categories/repositories/category.repository';
 import { Category } from 'src/modules/categories/entities/category.entity';
@@ -29,6 +33,7 @@ export class ProductService {
   constructor(
     private readonly productRepository: ProductRepository,
     private readonly productVariantRepository: ProductVariantRepository,
+    private readonly productSpecificationRepository: ProductSpecificationRepository,
     private readonly categoryRepository: CategoryRepository,
 
     @Inject(CACHE_MANAGER)
@@ -860,6 +865,160 @@ export class ProductService {
     return {
       id: variantId,
       message: 'Variant deleted successfully.',
+    };
+  }
+
+  // ========================== SPECIFICATION SERVICES ================================
+
+  /**
+   * ------ POST - Create specification (Vendor)
+   * Adds a new specification key-value pair to a product owned by the vendor.
+   * Verifies product ownership before adding.
+   */
+  async createSpecification(
+    productId: string,
+    createProductSpecificationDto: CreateProductSpecificationDto,
+    vendorId: string,
+  ) {
+    const product: Product | null =
+      await this.productRepository.findProductByIdAndVendor(
+        productId,
+        vendorId,
+      );
+
+    if (!product) {
+      throw new NotFoundException('Product not found.');
+    }
+
+    const savedSpec: ProductSpecification =
+      await this.productSpecificationRepository.createSpecification({
+        productId: productId,
+        key: createProductSpecificationDto.key,
+        value: createProductSpecificationDto.value,
+        sortOrder: createProductSpecificationDto.sortOrder ?? 0,
+      });
+
+    await this.invalidateCachedProductsVersion();
+
+    return {
+      message: 'Specification created successfully.',
+      id: savedSpec.id,
+      productId: savedSpec.productId,
+      key: savedSpec.key,
+      value: savedSpec.value,
+      sortOrder: savedSpec.sortOrder,
+    };
+  }
+
+  /**
+   * ------ GET - Fetch specifications by product ID (Vendor)
+   * Retrieves all specifications for a product owned by the vendor.
+   */
+  async getSpecificationsByProductId(productId: string, vendorId: string) {
+    const product: Product | null =
+      await this.productRepository.findProductByIdAndVendor(
+        productId,
+        vendorId,
+      );
+
+    if (!product) {
+      throw new NotFoundException('Product not found.');
+    }
+
+    return await this.productSpecificationRepository.findSpecificationsByProductId(
+      productId,
+    );
+  }
+
+  /**
+   * ------ GET - Fetch specification by ID (Vendor)
+   * Retrieves a single specification owned by the vendor.
+   */
+  async getSpecificationById(specId: string, vendorId: string) {
+    const spec: ProductSpecification | null =
+      await this.productSpecificationRepository.findSpecificationById(specId);
+
+    if (!spec || spec.product?.vendorId !== vendorId) {
+      throw new NotFoundException('Specification not found.');
+    }
+
+    return {
+      id: spec.id,
+      productId: spec.productId,
+      key: spec.key,
+      value: spec.value,
+      sortOrder: spec.sortOrder,
+    };
+  }
+
+  /**
+   * ------ PUT - Update specification (Vendor)
+   * Updates key, value, or sort order on a specification owned by the vendor.
+   */
+  async updateSpecification(
+    specId: string,
+    updateProductSpecificationDto: UpdateProductSpecificationDto,
+    vendorId: string,
+  ) {
+    const spec: ProductSpecification | null =
+      await this.productSpecificationRepository.findSpecificationById(specId);
+
+    if (!spec || spec.product?.vendorId !== vendorId) {
+      throw new NotFoundException('Specification not found.');
+    }
+
+    const updateData: Partial<ProductSpecification> = {};
+    if (updateProductSpecificationDto.key !== undefined) {
+      updateData.key = updateProductSpecificationDto.key;
+    }
+    if (updateProductSpecificationDto.value !== undefined) {
+      updateData.value = updateProductSpecificationDto.value;
+    }
+    if (updateProductSpecificationDto.sortOrder !== undefined) {
+      updateData.sortOrder = updateProductSpecificationDto.sortOrder;
+    }
+
+    const updatedSpec =
+      await this.productSpecificationRepository.updateSpecification(
+        specId,
+        updateData,
+      );
+
+    if (!updatedSpec) {
+      throw new NotFoundException('Specification not found.');
+    }
+
+    await this.invalidateCachedProductsVersion();
+
+    return {
+      message: 'Specification updated successfully.',
+      id: updatedSpec.id,
+      productId: updatedSpec.productId,
+      key: updatedSpec.key,
+      value: updatedSpec.value,
+      sortOrder: updatedSpec.sortOrder,
+    };
+  }
+
+  /**
+   * ------ DELETE - Delete specification (Vendor)
+   * Deletes a specification owned by the vendor.
+   */
+  async deleteSpecification(specId: string, vendorId: string) {
+    const spec: ProductSpecification | null =
+      await this.productSpecificationRepository.findSpecificationById(specId);
+
+    if (!spec || spec.product?.vendorId !== vendorId) {
+      throw new NotFoundException('Specification not found.');
+    }
+
+    await this.productSpecificationRepository.delete(specId);
+
+    await this.invalidateCachedProductsVersion();
+
+    return {
+      id: specId,
+      message: 'Specification deleted successfully.',
     };
   }
 }

@@ -4,6 +4,7 @@ import { Category } from 'src/modules/categories/entities/category.entity';
 import { Product } from 'src/modules/products/entities/product.entity';
 import { ProductVariant } from 'src/modules/products/entities/product-variant.entity';
 import { ProductImage } from 'src/modules/products/entities/product-image.entity';
+import { ProductSpecification } from 'src/modules/products/entities/product-specification.entity';
 import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 import {
   ProductStatusEnum,
@@ -254,6 +255,56 @@ async function seedProducts(): Promise<void> {
         variants.push(variant);
       }
 
+      // Create specifications (at least 3 specs per product)
+      const specs: ProductSpecification[] = [];
+      const specKeys = [
+        'Brand',
+        'Material',
+        'Weight',
+        'Warranty',
+        'Origin',
+        'Model',
+        'Color',
+        'Dimensions',
+      ];
+      const specValues: Record<string, string[]> = {
+        Brand: ['Acme', 'PremiumCo', 'EcoTech', 'ClassicDesign', 'Apex'],
+        Material: [
+          'Aluminium',
+          'Stainless Steel',
+          'BPA-Free Plastic',
+          'Genuine Leather',
+          'Organic Cotton',
+          'Tempered Glass',
+        ],
+        Weight: ['120g', '250g', '450g', '1.2kg', '800g'],
+        Warranty: [
+          '6 Months',
+          '1 Year',
+          '2 Years',
+          'Lifetime Warranty',
+          'No Warranty',
+        ],
+        Origin: ['USA', 'Germany', 'Japan', 'South Korea', 'Vietnam', 'Canada'],
+        Model: ['Model X', 'Version 2.0', 'Pro Edition', 'Lite', 'Elite'],
+        Color: COLORS,
+        Dimensions: ['10x5x2 cm', '15x15x10 cm', '20x10x5 cm', '5x5x5 cm'],
+      };
+
+      const shuffledKeys = [...specKeys].sort(() => 0.5 - Math.random());
+      const numSpecs = getRandomNumber(3, 5);
+
+      for (let sIdx = 0; sIdx < numSpecs; sIdx++) {
+        const spec = new ProductSpecification();
+        const key = shuffledKeys[sIdx];
+        const val = getRandomElement(specValues[key]);
+        spec.key = key;
+        spec.value = String(val);
+        spec.sortOrder = sIdx;
+        specs.push(spec);
+      }
+
+      product.productSpecifications = specs;
       product.productVariants = variants;
       products.push(product);
     }

@@ -138,9 +138,7 @@ describe('AuthService', () => {
 
     service = module.get<AuthService>(AuthService);
 
-    dataSource.transaction.mockImplementation(async (cb) =>
-      cb({} as EntityManager),
-    );
+    dataSource.transaction.mockImplementation(async (cb) => cb({}));
     configService.get.mockImplementation((key: string) => {
       const secrets: Record<string, string> = {
         JWT_REFRESH_SECRET_KEY: 'refresh-secret',
@@ -277,9 +275,7 @@ describe('AuthService', () => {
     it('should throw BadRequestException when passwords do not match', async () => {
       const dto = { ...registerVendorDto, confirmPassword: 'Mismatch@123' };
 
-      await expect(
-        service.registerVendor(dto, userIpAddress),
-      ).rejects.toThrow(
+      await expect(service.registerVendor(dto, userIpAddress)).rejects.toThrow(
         new BadRequestException('Passwords does not match. Please try again.'),
       );
       expect(userRepository.registerUserAsEmail).not.toHaveBeenCalled();
@@ -290,9 +286,7 @@ describe('AuthService', () => {
 
       await expect(
         service.registerVendor(registerVendorDto, userIpAddress),
-      ).rejects.toThrow(
-        ConflictException,
-      );
+      ).rejects.toThrow(ConflictException);
     });
   });
 
@@ -481,7 +475,11 @@ describe('AuthService', () => {
       });
       expect(jwtTokenService.generateAndSaveToken).toHaveBeenCalledWith(
         'user-id',
-        { id: 'user-id', email: 'john.doe@example.com', role: UserRoleEnum.CUSTOMER },
+        {
+          id: 'user-id',
+          email: 'john.doe@example.com',
+          role: UserRoleEnum.CUSTOMER,
+        },
         'reset-secret',
         '7d',
         'resetPasswordToken',
@@ -499,10 +497,7 @@ describe('AuthService', () => {
       userRepository.findUser.mockResolvedValue(null);
 
       await expect(
-        service.forgetPassword(
-          { email: 'missing@example.com' },
-          userIpAddress,
-        ),
+        service.forgetPassword({ email: 'missing@example.com' }, userIpAddress),
       ).rejects.toThrow('Invalid email. Please try again.');
     });
   });

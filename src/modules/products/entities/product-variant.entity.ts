@@ -12,7 +12,6 @@ import {
 import { Product } from './product.entity';
 import { ProductImage } from './product-image.entity';
 import { VariantStatusEnum } from 'src/common/enums/product-status.enum';
-
 @Entity({ name: 'product_variants' })
 export class ProductVariant {
   @PrimaryGeneratedColumn('uuid')

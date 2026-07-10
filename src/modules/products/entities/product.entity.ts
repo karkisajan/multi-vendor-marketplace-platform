@@ -14,6 +14,7 @@ import {
 import { ProductVariant } from './product-variant.entity';
 import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 import { Bookmark } from 'src/modules/bookmarks/entities/bookmark.entity';
+import { ProductSpecification } from './product-specification.entity';
 
 @Entity({ name: 'products' })
 export class Product {
@@ -65,6 +66,13 @@ export class Product {
 
   @OneToMany(() => Bookmark, (bookmark) => bookmark.product)
   bookmarks: Bookmark[];
+
+  @OneToMany(
+    () => ProductSpecification,
+    (productSpecification) => productSpecification.product,
+    { cascade: true },
+  )
+  productSpecifications: ProductSpecification[];
 
   @CreateDateColumn()
   createdAt: Date;
