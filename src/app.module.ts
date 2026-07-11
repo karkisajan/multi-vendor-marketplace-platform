@@ -75,6 +75,9 @@ import { BookmarksModule } from './modules/bookmarks/bookmarks.module';
         synchronize: false,
         namingStrategy: new SnakeNamingStrategy(),
         autoLoadEntities: true,
+        extra: {
+          max: 20,
+        },
       }),
     }),
     CategoriesModule,

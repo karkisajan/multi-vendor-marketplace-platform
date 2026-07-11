@@ -14,4 +14,5 @@ export const getTypeOrmConfig = (): DataSourceOptions => ({
   migrationsTableName: 'migrations',
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,
+  logging: true,
 });

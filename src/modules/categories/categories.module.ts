@@ -6,6 +6,9 @@ import { VendorCategoryController } from './controllers/vendor-category.controll
 import { CategoryService } from './services/category.service';
 import { CategoryRepository } from './repositories/category.repository';
 import { Category } from './entities/category.entity';
+import { ProductRepository } from '../products/repositories/product.repository';
+import { CategoryHelperService } from './services/category-helper.service';
+import { CustomerCategoryService } from './services/customer-category.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Category])],
@@ -14,7 +17,13 @@ import { Category } from './entities/category.entity';
     CustomerCategoryController,
     VendorCategoryController,
   ],
-  providers: [CategoryService, CategoryRepository],
+  providers: [
+    CategoryService,
+    CustomerCategoryService,
+    CategoryRepository,
+    CategoryHelperService,
+    ProductRepository,
+  ],
   exports: [CategoryService, CategoryRepository],
 })
 export class CategoriesModule {}

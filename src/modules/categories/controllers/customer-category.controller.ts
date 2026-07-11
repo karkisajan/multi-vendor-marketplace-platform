@@ -1,15 +1,15 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { CategoryService } from '../services/category.service';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import {
   ApiGetAllParentCategories,
   ApiGetCategoryTree,
 } from '../decorators/category-swagger.decorator';
+import { CustomerCategoryService } from '../services/customer-category.service';
 
 @ApiTags('Customer Categories')
 @Controller('/categories')
 export class CustomerCategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: CustomerCategoryService) {}
 
   /**
    * ------ GET - Get all parent categories
@@ -32,5 +32,22 @@ export class CustomerCategoryController {
   @Get('/category-tree')
   async getCategoryTree() {
     return await this.categoryService.getCategoryTreeCustomer();
+  }
+
+  /**
+   * ------ GET - Get products of a category
+   * Retrieves the product-lists based on provided category.
+   */
+  @Get('/:categoryId/products')
+  async getProductsOfCategory(
+    @Param('categoryId') categoryId: string,
+    @Query('limit') limit: number,
+    @Query('cursor') cursor?: string,
+  ) {
+    return await this.categoryService.getProductsOfCategory({
+      limit,
+      cursor,
+      categoryId,
+    });
   }
 }
