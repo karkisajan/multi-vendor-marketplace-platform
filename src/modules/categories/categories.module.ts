@@ -8,6 +8,8 @@ import { Category } from './entities/category.entity';
 import { ProductRepository } from '../products/repositories/product.repository';
 import { CategoryHelperService } from './services/category-helper.service';
 import { CustomerCategoryService } from './services/customer-category.service';
+import { AdminCategoryService } from './services/admin-category.service';
+import { VendorCategoryService } from './services/vendor-category.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Category])],
@@ -17,6 +19,8 @@ import { CustomerCategoryService } from './services/customer-category.service';
     VendorCategoryController,
   ],
   providers: [
+    AdminCategoryService,
+    VendorCategoryService,
     CustomerCategoryService,
     CategoryRepository,
     CategoryHelperService,
@@ -24,4 +28,4 @@ import { CustomerCategoryService } from './services/customer-category.service';
   ],
   exports: [CategoryRepository],
 })
-export class CategoriesModule { }
+export class CategoriesModule {}

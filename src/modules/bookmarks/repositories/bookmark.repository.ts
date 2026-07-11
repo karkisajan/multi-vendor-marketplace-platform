@@ -43,7 +43,7 @@ export class BookmarkRepository extends Repository<Bookmark> {
     bookmarkType: BookmarkTypeEnum,
     productId?: string,
     vendorProfileId?: string,
-  ): Promise<void> {
+  ) {
     const whereCondition: FindOptionsWhere<Bookmark> = {
       customerId: customerId,
       bookmarkType: bookmarkType,
@@ -57,6 +57,6 @@ export class BookmarkRepository extends Repository<Bookmark> {
       whereCondition.vendorProfileId = vendorProfileId;
     }
 
-    await this.delete(whereCondition);
+    return await this.delete(whereCondition);
   }
 }

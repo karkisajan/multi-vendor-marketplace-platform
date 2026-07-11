@@ -1,4 +1,4 @@
 export enum BookmarkTypeEnum {
-  PRODUCT = 'PRODUCT',
-  BUSINESS = 'BUSINESS',
+  PRODUCT = 'product',
+  BUSINESS = 'business',
 }

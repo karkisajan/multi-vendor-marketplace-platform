@@ -29,7 +29,6 @@ export class Bookmark {
   @Column({
     type: 'enum',
     enum: BookmarkTypeEnum,
-    name: 'bookmark_type',
   })
   bookmarkType: BookmarkTypeEnum;
 

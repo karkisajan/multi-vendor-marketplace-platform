@@ -6,7 +6,7 @@ import { CreateBookmarkDto } from '../dto/create-bookmark.dto';
 import { BookmarkService } from '../services/bookmark.service';
 
 @ApiTags('Customer Bookmarks')
-@Controller('/customers/bookmarks')
+@Controller('/bookmarks')
 export class BookmarkController {
   constructor(private readonly bookmarkService: BookmarkService) {}
 

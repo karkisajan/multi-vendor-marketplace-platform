@@ -56,12 +56,18 @@ export class BookmarkService {
         );
 
       if (existingBookmark) {
-        await this.bookmarkRepository.deleteBookmark(
+        const removedBookmark = await this.bookmarkRepository.deleteBookmark(
           user?.customerProfile.id,
           createBookmarkDto.bookmarkType,
           createBookmarkDto.productId,
           undefined,
         );
+
+        if (removedBookmark.affected === 1) {
+          return {
+            message: 'Bookmark removed successfully.',
+          };
+        }
       }
 
       const bookmark = await this.bookmarkRepository.createBookmark(
@@ -96,12 +102,18 @@ export class BookmarkService {
         );
 
       if (existingBookmark) {
-        await this.bookmarkRepository.deleteBookmark(
+        const removedBookmark = await this.bookmarkRepository.deleteBookmark(
           user?.customerProfile.id,
           createBookmarkDto.bookmarkType,
           undefined,
           createBookmarkDto.vendorProfileId,
         );
+
+        if (removedBookmark.affected === 1) {
+          return {
+            message: 'Bookmark removed successfully.',
+          };
+        }
       }
 
       const bookmark = await this.bookmarkRepository.createBookmark(
