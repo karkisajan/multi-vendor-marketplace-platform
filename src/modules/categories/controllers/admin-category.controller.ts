@@ -8,7 +8,6 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { CategoryService } from '../services/category.service';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateCategoryDto } from '../dto/create-category.dto';
 import { UpdateCategoryDto } from '../dto/update-category.dto';
@@ -20,11 +19,12 @@ import {
   ApiUpdateCategory,
 } from '../decorators/category-swagger.decorator';
 import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
+import { AdminCategoryService } from '../services/admin-category.service';
 
 @ApiTags('Admin Categories')
 @Controller('admin/categories')
 export class AdminCategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: AdminCategoryService) {}
 
   /**
    * ------ GET - Get flat categories

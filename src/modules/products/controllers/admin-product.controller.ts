@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Put, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { ProductService } from '../services/product.service';
+import { AdminProductService } from '../services/admin-product.service';
 import { UpdateProductStatusDto } from '../dto/admin/update-product-status.dto';
 import { AdminUpdateProductDto } from '../dto/admin/admin-update-product.dto';
 import {
@@ -14,7 +14,7 @@ import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 @ApiTags('Admin Products')
 @Controller('/admin/products')
 export class AdminProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(private readonly productService: AdminProductService) {}
 
   @Get('/')
   async getAllProductsAdmin(

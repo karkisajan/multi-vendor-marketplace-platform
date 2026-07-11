@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AdminCategoryController } from './controllers/admin-category.controller';
 import { CustomerCategoryController } from './controllers/customer-category.controller';
 import { VendorCategoryController } from './controllers/vendor-category.controller';
-import { CategoryService } from './services/category.service';
 import { CategoryRepository } from './repositories/category.repository';
 import { Category } from './entities/category.entity';
 import { ProductRepository } from '../products/repositories/product.repository';
@@ -18,12 +17,11 @@ import { CustomerCategoryService } from './services/customer-category.service';
     VendorCategoryController,
   ],
   providers: [
-    CategoryService,
     CustomerCategoryService,
     CategoryRepository,
     CategoryHelperService,
     ProductRepository,
   ],
-  exports: [CategoryService, CategoryRepository],
+  exports: [CategoryRepository],
 })
-export class CategoriesModule {}
+export class CategoriesModule { }

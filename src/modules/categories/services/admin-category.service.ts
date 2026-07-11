@@ -14,11 +14,10 @@ import { StatusTypeEnum } from 'src/common/enums/status-type.enum';
 import { FindOptionsWhere, ILike } from 'typeorm';
 import { Cache, CACHE_MANAGER } from '@nestjs/cache-manager';
 import { randomUUID } from 'crypto';
-import {} from 'src/common/utils/cursor-pagination.util';
 import { CategoryHelperService } from './category-helper.service';
 
 @Injectable()
-export class CategoryService {
+export class AdminCategoryService {
   constructor(
     private readonly categoryRepository: CategoryRepository,
     private readonly categoryHelperService: CategoryHelperService,

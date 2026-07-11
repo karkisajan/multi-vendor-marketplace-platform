@@ -8,7 +8,8 @@ import { ProductRepository } from './repositories/product.repository';
 import { ProductVariantRepository } from './repositories/product-variant.repository';
 import { ProductImageRepository } from './repositories/product-image.repository';
 import { ProductSpecificationRepository } from './repositories/product-specification.repository';
-import { ProductService } from './services/product.service';
+import { VendorProductService } from './services/vendor-product.service';
+import { AdminProductService } from './services/admin-product.service';
 import { VendorProductController } from './controllers/vendor-product.controller';
 import { AdminProductController } from './controllers/admin-product.controller';
 import { CategoryRepository } from '../categories/repositories/category.repository';
@@ -30,7 +31,8 @@ import { CustomerProductService } from './services/customer-product.service';
     CustomerProductController,
   ],
   providers: [
-    ProductService,
+    VendorProductService,
+    AdminProductService,
     CustomerProductService,
     ProductRepository,
     ProductVariantRepository,
@@ -39,7 +41,9 @@ import { CustomerProductService } from './services/customer-product.service';
     CategoryRepository,
   ],
   exports: [
-    ProductService,
+    VendorProductService,
+    AdminProductService,
+    CustomerProductService,
     ProductRepository,
     ProductVariantRepository,
     ProductImageRepository,

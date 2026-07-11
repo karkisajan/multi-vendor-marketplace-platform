@@ -9,7 +9,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { ProductService } from '../services/product.service';
+import { VendorProductService } from '../services/vendor-product.service';
 import {
   ApiVendorCreateProduct,
   ApiVendorCreateVariant,
@@ -38,7 +38,7 @@ import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 @ApiTags('Vendor Products')
 @Controller('/vendor/products')
 export class VendorProductController {
-  constructor(private readonly productService: ProductService) {}
+  constructor(private readonly productService: VendorProductService) {}
 
   /**
    * ------ GET - Fetch all products (Vendor)
