@@ -219,18 +219,24 @@ export class BookmarkService {
           type: BookmarkTypeEnum.BUSINESS,
           id: vendor.id,
           email: vendor.email,
-          vendorProfile: {
-            id: vendorProfile.id,
-            businessName: vendorProfile.businessName,
-            businessProfileUrl: vendorProfile.businessProfileUrl,
-          },
+          vendorProfile: vendorProfile
+            ? {
+                id: vendorProfile.id,
+                businessName: vendorProfile.businessName,
+                businessProfileUrl: vendorProfile.businessProfileUrl,
+              }
+            : null,
         };
       });
 
-    const result = [
+    let result = [
       ...refinedBookmarkedProductsData,
       ...refinedBookmarkedVendorProfileData,
     ];
+
+    if (bookmarkType) {
+      result = result.filter((res) => res.type === bookmarkType);
+    }
 
     return result.length === 0
       ? {
