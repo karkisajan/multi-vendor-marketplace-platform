@@ -15,6 +15,7 @@ import { UserRoleEnum } from 'src/common/enums/user-role.enum';
 import { VendorProfile } from './vendor-profile.entity';
 import { AuditLog } from 'src/modules/audit-logs/entities/audit-logs.entity';
 import { Product } from 'src/modules/products/entities/product.entity';
+import { Bookmark } from 'src/modules/bookmarks/entities/bookmark.entity';
 
 @Entity({ name: 'users' })
 export class User {
@@ -84,4 +85,8 @@ export class User {
   /* One to many relation (A vendor business can have multiple products) */
   @OneToMany(() => Product, (product) => product.user, { cascade: true })
   products: Product[];
+
+  /* One to many relation (A customer can have multiple bookmarks) */
+  @OneToMany(() => Bookmark, (bookmark) => bookmark.customer || bookmark.vendor)
+  bookmarks: Bookmark[];
 }

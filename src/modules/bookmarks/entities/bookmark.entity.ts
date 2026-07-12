@@ -7,10 +7,9 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { CustomerProfile } from 'src/modules/users/entities/customer-profile.entity';
 import { Product } from 'src/modules/products/entities/product.entity';
-import { VendorProfile } from 'src/modules/users/entities/vendor-profile.entity';
 import { BookmarkTypeEnum } from 'src/common/enums/bookmark-type.enum';
+import { User } from 'src/modules/users/entities/user.entity';
 
 @Entity({ name: 'bookmarks' })
 export class Bookmark {
@@ -20,11 +19,11 @@ export class Bookmark {
   @Column({ nullable: false, type: 'uuid', name: 'customer_id' })
   customerId: string;
 
+  @Column({ nullable: true, type: 'uuid', name: 'vendor_id' })
+  vendorId: string | null;
+
   @Column({ nullable: true, type: 'uuid', name: 'product_id' })
   productId: string | null;
-
-  @Column({ nullable: true, type: 'uuid', name: 'vendor_profile_id' })
-  vendorProfileId: string | null;
 
   @Column({
     type: 'enum',
@@ -36,13 +35,13 @@ export class Bookmark {
   @JoinColumn({ name: 'product_id' })
   product: Product | null;
 
-  @ManyToOne(() => CustomerProfile, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'customer_id' })
-  customer: CustomerProfile;
+  customer: User;
 
-  @ManyToOne(() => VendorProfile, { nullable: true, onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'vendor_profile_id' })
-  vendorProfile: VendorProfile | null;
+  @ManyToOne(() => User, { nullable: true, onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'vendor_id' })
+  vendor: User;
 
   @CreateDateColumn()
   createdAt: Date;

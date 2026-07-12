@@ -17,7 +17,7 @@ export class BookmarkRepository extends Repository<Bookmark> {
     const whereCondition: FindOptionsWhere<Bookmark> =
       bookmarkType === BookmarkTypeEnum.PRODUCT
         ? { customerId, bookmarkType, productId: targetId }
-        : { customerId, bookmarkType, vendorProfileId: targetId };
+        : { customerId, bookmarkType, vendorId: targetId };
 
     return await this.exists({ where: whereCondition });
   }
@@ -26,13 +26,13 @@ export class BookmarkRepository extends Repository<Bookmark> {
     customerId: string,
     bookmarkType: BookmarkTypeEnum,
     productId?: string,
-    vendorProfileId?: string,
+    vendorId?: string,
   ): Promise<Bookmark> {
     const bookmark = this.create({
       customerId,
       bookmarkType,
       productId: productId ?? null,
-      vendorProfileId: vendorProfileId ?? null,
+      vendorId: vendorId ?? null,
     });
 
     return await this.save(bookmark);
@@ -54,7 +54,7 @@ export class BookmarkRepository extends Repository<Bookmark> {
     }
 
     if (vendorProfileId) {
-      whereCondition.vendorProfileId = vendorProfileId;
+      whereCondition.vendorId = vendorProfileId;
     }
 
     return await this.delete(whereCondition);

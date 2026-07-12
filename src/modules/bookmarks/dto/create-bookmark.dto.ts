@@ -41,5 +41,5 @@ export class CreateBookmarkDto {
     message: 'Vendor profile ID is required for business bookmarks.',
   })
   @IsUUID('4', { message: 'Vendor profile ID must be a valid UUID.' })
-  vendorProfileId: string;
+  vendorId: string;
 }
