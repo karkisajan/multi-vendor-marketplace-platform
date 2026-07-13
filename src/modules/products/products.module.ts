@@ -15,6 +15,7 @@ import { AdminProductController } from './controllers/admin-product.controller';
 import { CategoryRepository } from '../categories/repositories/category.repository';
 import { CustomerProductController } from './controllers/customer-product.controller';
 import { CustomerProductService } from './services/customer-product.service';
+import { ProductRatingRepository } from './repositories/product-rating.repository';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { CustomerProductService } from './services/customer-product.service';
     ProductVariantRepository,
     ProductImageRepository,
     ProductSpecificationRepository,
+    ProductRatingRepository,
     CategoryRepository,
   ],
   exports: [

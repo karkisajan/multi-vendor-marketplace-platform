@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { join } from 'path';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';
@@ -102,6 +102,13 @@ export class AppModule implements NestModule {
     consumer
       .apply(AuthenticationMiddleware)
       .exclude('/auth')
-      .forRoutes('/users', '/vendor', '/bookmarks');
+      .forRoutes(
+        '/users',
+        '/vendor',
+        '/bookmarks',
+        { path: '/products/:productId/ratings', method: RequestMethod.POST },
+        { path: '/products/ratings/:id', method: RequestMethod.PATCH },
+        { path: '/products/ratings/:id', method: RequestMethod.DELETE },
+      );
   }
 }

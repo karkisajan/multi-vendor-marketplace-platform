@@ -1,5 +1,7 @@
 import {
   BadRequestException,
+  ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -10,16 +12,22 @@ import { ProductStatusEnum } from 'src/common/enums/product-status.enum';
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
 import { ProductImage } from '../entities/product-image.entity';
+import { ProductRating } from '../entities/product-rating.entity';
 import {
   decodeCursor,
   encodeCursor,
 } from 'src/common/utils/cursor-pagination.util';
 import { DatePostedTypeEnum } from 'src/common/enums/date-filters.enum';
+import { CurrentUserContext } from 'src/modules/users/types/user.types';
+import { ProductRatingRepository } from '../repositories/product-rating.repository';
+import { CreateProductRatingDto } from '../dto/customer/create-product-rating.dto';
+import { UpdateProductRatingDto } from '../dto/customer/update-product-rating.dto';
 
 @Injectable()
 export class CustomerProductService {
   constructor(
     private readonly productRepository: ProductRepository,
+    private readonly productRatingRepository: ProductRatingRepository,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -462,5 +470,125 @@ export class CustomerProductService {
 
     await this.cacheManager.set(cacheKey, result, 10 * 1000);
     return result;
+  }
+
+  /**
+   * ------ POST - Create product rating (Customer)
+   * Validates that the product exists and is published, ensures the customer has not
+   * already rated it, and persists the new rating with the authenticated user as owner.
+   */
+  async createRating(
+    productId: string,
+    createProductRatingDto: CreateProductRatingDto,
+    user: CurrentUserContext,
+  ) {
+    const product: Product | null =
+      await this.productRepository.findProductById(productId);
+
+    if (!product || product.status !== ProductStatusEnum.PUBLISHED) {
+      throw new NotFoundException('Product not found.');
+    }
+
+    const existingRating: ProductRating | null =
+      await this.productRatingRepository.findOne({
+        where: { productId: productId, customerId: user.id },
+      });
+
+    if (existingRating) {
+      throw new ConflictException('You have already rated this product.');
+    }
+
+    const rating: ProductRating = this.productRatingRepository.create({
+      productId: productId,
+      customerId: user.id,
+      score: createProductRatingDto.score,
+      comment: createProductRatingDto.comment,
+    });
+
+    const savedRating: ProductRating =
+      await this.productRatingRepository.save(rating);
+
+    return {
+      message: 'Rating added successfully.',
+      data: {
+        id: savedRating.id,
+        score: savedRating.score,
+        comment: savedRating.comment,
+        productId: savedRating.productId,
+        createdAt: savedRating.createdAt,
+      },
+    };
+  }
+
+  /**
+   * ------ PATCH - Update own product rating (Customer)
+   * Finds the rating by ID, verifies the authenticated user owns it,
+   * and applies the partial update to score and/or comment.
+   */
+  async updateRating(
+    ratingId: string,
+    updateProductRatingDto: UpdateProductRatingDto,
+    user: CurrentUserContext,
+  ) {
+    const rating: ProductRating | null =
+      await this.productRatingRepository.findOne({
+        where: { id: ratingId },
+      });
+
+    if (!rating) {
+      throw new NotFoundException('Rating not found.');
+    }
+
+    if (rating.customerId !== user.id) {
+      throw new ForbiddenException('You can only update your own ratings.');
+    }
+
+    /* Apply partial updates */
+    if (updateProductRatingDto.score !== undefined) {
+      rating.score = updateProductRatingDto.score;
+    }
+    if (updateProductRatingDto.comment !== undefined) {
+      rating.comment = updateProductRatingDto.comment;
+    }
+
+    const updatedRating: ProductRating =
+      await this.productRatingRepository.save(rating);
+
+    return {
+      message: 'Rating updated successfully.',
+      data: {
+        id: updatedRating.id,
+        score: updatedRating.score,
+        comment: updatedRating.comment,
+        productId: updatedRating.productId,
+        updatedAt: updatedRating.updatedAt,
+      },
+    };
+  }
+
+  /**
+   * ------ DELETE - Delete own product rating (Customer)
+   * Finds the rating by ID, verifies ownership, and performs a soft-delete
+   * so the record is excluded from queries but retained for auditing.
+   */
+  async deleteRating(ratingId: string, user: CurrentUserContext) {
+    const rating: ProductRating | null =
+      await this.productRatingRepository.findOne({
+        where: { id: ratingId },
+      });
+
+    if (!rating) {
+      throw new NotFoundException('Rating not found.');
+    }
+
+    if (rating.customerId !== user.id) {
+      throw new ForbiddenException('You can only delete your own ratings.');
+    }
+
+    await this.productRatingRepository.softRemove(rating);
+
+    return {
+      message: 'Rating deleted successfully.',
+    };
   }
 }
