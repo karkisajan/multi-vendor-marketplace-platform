@@ -22,6 +22,13 @@ import { CurrentUserContext } from 'src/modules/users/types/user.types';
 import { ProductRatingRepository } from '../repositories/product-rating.repository';
 import { CreateProductRatingDto } from '../dto/customer/create-product-rating.dto';
 import { UpdateProductRatingDto } from '../dto/customer/update-product-rating.dto';
+import { Category } from 'src/modules/categories/entities/category.entity';
+import { SelectQueryBuilder } from 'typeorm';
+
+type ProductWithRatings = Product & {
+  averageRatings: number;
+  totalReviews: number;
+};
 
 @Injectable()
 export class CustomerProductService {
@@ -70,7 +77,7 @@ export class CustomerProductService {
     const cacheVersion: string = await this.getProductCachedVersion();
     const cacheKey: string = `categories:customers:v:${cacheVersion}:${JSON.stringify(
       {
-        limit: limit,
+        limit: normalizedLimit,
         cursor: cursor,
         search: search,
         categoryId: categoryId,
@@ -85,7 +92,7 @@ export class CustomerProductService {
       return cachedProductsData;
     }
 
-    const productBaseQuery = this.productRepository
+    const productBaseQuery: SelectQueryBuilder<Product> = this.productRepository
       .createQueryBuilder('product')
       .leftJoin(
         'product.productVariants',
@@ -99,23 +106,39 @@ export class CustomerProductService {
         'productImage.isPrimary = :isPrimary',
         { isPrimary: true },
       )
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .from(ProductRating, 'productRating')
+            .select('productRating.productId', 'productId')
+            .addSelect('AVG(productRating.score)', 'averageRatings')
+            .addSelect('COUNT(productRating.id)', 'totalReviews')
+            .groupBy('productRating.productId'),
+        'productRatingAggregation',
+        '"productRatingAggregation"."productId" = product.id',
+      )
       .leftJoin('product.category', 'category')
       .select([
         'product.id',
         'product.name',
-        'product.description',
         'product.slug',
         'product.createdAt',
         'productVariant.id',
         'productVariant.sellingPrice',
         'productVariant.crossPrice',
-        'productVariant.stockQuantity',
-        'productVariant.variantAttributes',
         'productImage.id',
         'productImage.imageUrl',
         'category.id',
         'category.name',
-      ]);
+      ])
+      .addSelect(
+        'COALESCE("productRatingAggregation"."averageRatings", 0)',
+        'averageRatings',
+      )
+      .addSelect(
+        'COALESCE("productRatingAggregation"."totalReviews", 0)',
+        'totalReviews',
+      );
 
     if (search?.trim()) {
       productBaseQuery.andWhere(
@@ -125,12 +148,16 @@ export class CustomerProductService {
       );
     }
 
+    /**
+     * Filter products by selected category (CategoryId)
+     */
     if (categoryId) {
       productBaseQuery.andWhere('product.categoryId = :categoryId', {
         categoryId: categoryId,
       });
     }
 
+    /* Filter products by min and max price */
     if (minPrice !== undefined || maxPrice !== undefined) {
       if (minPrice !== undefined && maxPrice !== undefined) {
         productBaseQuery.andWhere(
@@ -138,11 +165,11 @@ export class CustomerProductService {
           { minPrice: minPrice, maxPrice: maxPrice },
         );
       } else if (minPrice !== undefined) {
-        productBaseQuery.andWhere('productVariant.sellingPrice <= :minPrice', {
+        productBaseQuery.andWhere('productVariant.sellingPrice >= :minPrice', {
           minPrice: minPrice,
         });
       } else if (maxPrice !== undefined) {
-        productBaseQuery.andWhere('productVariant.sellingPrice >= :maxPrice', {
+        productBaseQuery.andWhere('productVariant.sellingPrice <= :maxPrice', {
           maxPrice: maxPrice,
         });
       }
@@ -172,6 +199,7 @@ export class CustomerProductService {
       });
     }
 
+    /* Apply cursor if next page cursor of products exists */
     if (cursor) {
       const { createdAt, id }: { createdAt: string; id: string } =
         decodeCursor(cursor);
@@ -182,21 +210,29 @@ export class CustomerProductService {
       );
     }
 
-    const productsData: Product[] = await productBaseQuery
+    productBaseQuery
       .andWhere('product.status = :status', {
         status: ProductStatusEnum.PUBLISHED,
       })
       .orderBy('product.createdAt', 'DESC')
       .addOrderBy('product.id', 'DESC')
-      .take(normalizedLimit + 1)
-      .getMany();
+      .take(normalizedLimit + 1);
+
+    const { entities, raw } = await productBaseQuery.getRawAndEntities();
+    const productsData: ProductWithRatings[] = entities.map(
+      (entity, index) => ({
+        ...entity,
+        averageRatings: Number(raw[index]?.averageRatings ?? 0),
+        totalReviews: Number(raw[index]?.totalReviews ?? 0),
+      }),
+    );
 
     const hasNextPage: boolean = productsData.length > normalizedLimit;
-    const paginatedProductsData: Product[] = hasNextPage
+    const paginatedProductsData: ProductWithRatings[] = hasNextPage
       ? productsData.slice(0, normalizedLimit)
       : productsData;
 
-    const lastProductOfPaginatedData: Product =
+    const lastProductOfPaginatedData: ProductWithRatings =
       paginatedProductsData[paginatedProductsData.length - 1];
 
     const nextPageCursor: string | null = hasNextPage
@@ -207,23 +243,23 @@ export class CustomerProductService {
       : null;
 
     const refinedProductsResponseData = paginatedProductsData.map(
-      (product: Product) => {
+      (product: ProductWithRatings) => {
         const productVariant: ProductVariant = product.productVariants[0];
         const productImage: ProductImage = productVariant?.productImages[0];
+        const category: Category = product.category;
 
         return {
           id: product.id,
           name: product.name,
           slug: product.slug,
-          description: product.description,
           createdAt: product.createdAt,
+          averageRatings: product.averageRatings,
+          totalReviews: product.totalReviews,
           productVariant: productVariant
             ? {
                 id: productVariant.id,
                 sellingPrice: productVariant.sellingPrice,
                 crossPrice: productVariant.crossPrice,
-                stockQuantity: productVariant.stockQuantity,
-                variantAttributes: productVariant.variantAttributes,
                 productImage: productImage
                   ? {
                       id: productImage.id,
@@ -232,11 +268,12 @@ export class CustomerProductService {
                   : null,
               }
             : null,
-
-          category: {
-            id: product.category.id,
-            name: product.category.name,
-          },
+          category: category
+            ? {
+                id: category.id,
+                name: category.name,
+              }
+            : null,
         };
       },
     );
