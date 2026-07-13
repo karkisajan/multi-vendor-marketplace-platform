@@ -218,7 +218,9 @@ export class CustomerProductService {
       .addOrderBy('product.id', 'DESC')
       .take(normalizedLimit + 1);
 
-    const { entities, raw } = await productBaseQuery.getRawAndEntities();
+    const { entities, raw } =
+      await productBaseQuery.getRawAndEntities<ProductWithRatings>();
+
     const productsData: ProductWithRatings[] = entities.map(
       (entity, index) => ({
         ...entity,
