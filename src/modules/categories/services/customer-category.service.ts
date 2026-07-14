@@ -18,7 +18,13 @@ import {
 import { ProductVariant } from 'src/modules/products/entities/product-variant.entity';
 import { ProductImage } from 'src/modules/products/entities/product-image.entity';
 import { CategoryHelperService } from './category-helper.service';
+import { ProductRating } from 'src/modules/products/entities/product-rating.entity';
+import { SelectQueryBuilder } from 'typeorm';
 
+type ProductWithRatings = Product & {
+  averageRatings: number;
+  totalReviews: number;
+};
 @Injectable()
 export class CustomerCategoryService {
   constructor(
@@ -152,7 +158,7 @@ export class CustomerCategoryService {
       throw new NotFoundException('Category not found');
     }
 
-    const productBaseQuery = this.productRepository
+    const productBaseQuery: SelectQueryBuilder<Product> = this.productRepository
       .createQueryBuilder('product')
       .leftJoin(
         'product.productVariants',
@@ -166,23 +172,36 @@ export class CustomerCategoryService {
         'productImage.isPrimary = :isPrimary',
         { isPrimary: true },
       )
-      .leftJoin('product.category', 'category')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .from(ProductRating, 'productRating')
+            .select('productRating.productId', 'productId')
+            .addSelect('AVG(productRating.score)', 'averageRatings')
+            .addSelect('COUNT(productRating.id)', 'totalReviews')
+            .groupBy('productRating.productId'),
+        'productRatingAggregation',
+        '"productRatingAggregation"."productId" = product.id',
+      )
       .select([
         'product.id',
         'product.name',
-        'product.description',
         'product.slug',
         'product.createdAt',
         'productVariant.id',
         'productVariant.sellingPrice',
         'productVariant.crossPrice',
-        'productVariant.stockQuantity',
-        'productVariant.variantAttributes',
         'productImage.id',
         'productImage.imageUrl',
-        'category.id',
-        'category.name',
-      ]);
+      ])
+      .addSelect(
+        'COALESCE("productRatingAggregation"."averageRatings", 0)',
+        'averageRatings',
+      )
+      .addSelect(
+        'COALESCE("productRatingAggregation"."totalReviews", 0)',
+        'totalReviews',
+      );
 
     if (cursor) {
       const { createdAt, id }: { createdAt: string; id: string } =
@@ -194,22 +213,31 @@ export class CustomerCategoryService {
       );
     }
 
-    const productsData: Product[] = await productBaseQuery
+    productBaseQuery
       .where('product.status = :status', {
         status: ProductStatusEnum.PUBLISHED,
       })
       .orderBy('product.createdAt', 'DESC')
       .addOrderBy('product.id', 'DESC')
-      .take(normalizedLimit + 1)
-      .getMany();
+      .take(normalizedLimit + 1);
+
+    const { entities, raw } =
+      await productBaseQuery.getRawAndEntities<ProductWithRatings>();
+
+    const productsData = entities.map((entity, index) => ({
+      ...entity,
+      averageRatings: Number(raw[index]?.averageRatings ?? 0),
+      totalReviews: Number(raw[index]?.totalReviews ?? 0),
+    }));
 
     const hasNextPage: boolean = productsData.length > normalizedLimit;
-    const paginatedProductsData: Product[] = hasNextPage
+    const paginatedProductsData: ProductWithRatings[] = hasNextPage
       ? productsData.slice(0, normalizedLimit)
       : productsData;
 
-    const lastProductOfPaginatedData: Product =
+    const lastProductOfPaginatedData: ProductWithRatings =
       paginatedProductsData[paginatedProductsData.length - 1];
+
     const nextPageCursor: string | null = hasNextPage
       ? encodeCursor(
           lastProductOfPaginatedData.createdAt,
@@ -218,7 +246,7 @@ export class CustomerCategoryService {
       : null;
 
     const refinedProductResponseData = paginatedProductsData.map(
-      (product: Product) => {
+      (product: ProductWithRatings) => {
         const productVariant: ProductVariant = product.productVariants[0];
         const productImage: ProductImage = productVariant?.productImages[0];
 
@@ -226,15 +254,14 @@ export class CustomerCategoryService {
           id: product.id,
           name: product.name,
           slug: product.slug,
-          description: product.description,
           createdAt: product.createdAt,
+          averageRatings: product.averageRatings,
+          totalReviews: product.totalReviews,
           productVariant: productVariant
             ? {
                 id: productVariant.id,
                 sellingPrice: productVariant.sellingPrice,
                 crossPrice: productVariant.crossPrice,
-                stockQuantity: productVariant.stockQuantity,
-                variantAttributes: productVariant.variantAttributes,
                 productImage: productImage
                   ? {
                       id: productImage.id,

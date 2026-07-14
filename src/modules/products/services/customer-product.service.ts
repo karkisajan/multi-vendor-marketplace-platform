@@ -22,7 +22,6 @@ import { CurrentUserContext } from 'src/modules/users/types/user.types';
 import { ProductRatingRepository } from '../repositories/product-rating.repository';
 import { CreateProductRatingDto } from '../dto/customer/create-product-rating.dto';
 import { UpdateProductRatingDto } from '../dto/customer/update-product-rating.dto';
-import { Category } from 'src/modules/categories/entities/category.entity';
 import { SelectQueryBuilder } from 'typeorm';
 
 type ProductWithRatings = Product & {
@@ -117,7 +116,6 @@ export class CustomerProductService {
         'productRatingAggregation',
         '"productRatingAggregation"."productId" = product.id',
       )
-      .leftJoin('product.category', 'category')
       .select([
         'product.id',
         'product.name',
@@ -128,8 +126,6 @@ export class CustomerProductService {
         'productVariant.crossPrice',
         'productImage.id',
         'productImage.imageUrl',
-        'category.id',
-        'category.name',
       ])
       .addSelect(
         'COALESCE("productRatingAggregation"."averageRatings", 0)',
@@ -248,7 +244,6 @@ export class CustomerProductService {
       (product: ProductWithRatings) => {
         const productVariant: ProductVariant = product.productVariants[0];
         const productImage: ProductImage = productVariant?.productImages[0];
-        const category: Category = product.category;
 
         return {
           id: product.id,
@@ -268,12 +263,6 @@ export class CustomerProductService {
                       imageUrl: productImage.imageUrl,
                     }
                   : null,
-              }
-            : null,
-          category: category
-            ? {
-                id: category.id,
-                name: category.name,
               }
             : null,
         };
@@ -425,7 +414,7 @@ export class CustomerProductService {
       throw new NotFoundException('Product not found.');
     }
 
-    const productBaseQuery = this.productRepository
+    const productBaseQuery: SelectQueryBuilder<Product> = this.productRepository
       .createQueryBuilder('product')
       .leftJoin(
         'product.productVariants',
@@ -439,25 +428,38 @@ export class CustomerProductService {
         'productImage.isPrimary = :isPrimary',
         { isPrimary: true },
       )
-      .leftJoin('product.category', 'category')
+      .leftJoin(
+        (subQuery) =>
+          subQuery
+            .from(ProductRating, 'productRating')
+            .select('productRating.productId', 'productId')
+            .addSelect('AVG(productRating.score)', 'averageRatings')
+            .addSelect('COUNT(productRating.id)', 'totalReviews')
+            .groupBy('productRating.productId'),
+        'productRatingAggregation',
+        '"productRatingAggregation"."productId" = product.id',
+      )
       .select([
         'product.id',
         'product.name',
-        'product.description',
         'product.slug',
         'product.createdAt',
         'productVariant.id',
         'productVariant.sellingPrice',
         'productVariant.crossPrice',
-        'productVariant.stockQuantity',
-        'productVariant.variantAttributes',
         'productImage.id',
         'productImage.imageUrl',
-        'category.id',
-        'category.name',
-      ]);
+      ])
+      .addSelect(
+        'COALESCE("productRatingAggregation"."averageRatings", 0)',
+        'averageRatings',
+      )
+      .addSelect(
+        'COALESCE("productRatingAggregation"."totalReviews", 0)',
+        'totalReviews',
+      );
 
-    const productsData: Product[] = await productBaseQuery
+    productBaseQuery
       .andWhere('product.status = :status', {
         status: ProductStatusEnum.PUBLISHED,
       })
@@ -465,36 +467,49 @@ export class CustomerProductService {
         categoryId: product.categoryId,
       })
       .take(10)
-      .orderBy('product.createdAt', 'DESC')
-      .getMany();
+      .orderBy('product.createdAt', 'DESC');
 
-    const refinedProductResponseData = productsData.map((product) => {
-      const productVariant: ProductVariant = product.productVariants[0];
-      const productImage: ProductImage = productVariant?.productImages[0];
+    const { entities, raw } =
+      await productBaseQuery.getRawAndEntities<ProductWithRatings>();
 
-      return {
-        id: product.id,
-        name: product.name,
-        slug: product.slug,
-        description: product.description,
-        createdAt: product.createdAt,
-        productVariant: productVariant
-          ? {
-              id: productVariant.id,
-              sellingPrice: productVariant.sellingPrice,
-              crossPrice: productVariant.crossPrice,
-              stockQuantity: productVariant.stockQuantity,
-              variantAttributes: productVariant.variantAttributes,
-              productImage: productImage
-                ? {
-                    id: productImage.id,
-                    imageUrl: productImage.imageUrl,
-                  }
-                : null,
-            }
-          : null,
-      };
-    });
+    const productsData: ProductWithRatings[] = entities.map(
+      (entity, index) => ({
+        ...entity,
+        averageRatings: Number(raw[index]?.averageRatings ?? 0),
+        totalReviews: Number(raw[index]?.totalReviews ?? 0),
+      }),
+    );
+
+    const refinedProductResponseData = productsData.map(
+      (product: ProductWithRatings) => {
+        const productVariant: ProductVariant = product.productVariants[0];
+        const productImage: ProductImage = productVariant?.productImages[0];
+
+        return {
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          createdAt: product.createdAt,
+          averageRatings: product.averageRatings,
+          totalReviews: product.totalReviews,
+          productVariant: productVariant
+            ? {
+                id: productVariant.id,
+                sellingPrice: productVariant.sellingPrice,
+                crossPrice: productVariant.crossPrice,
+                stockQuantity: productVariant.stockQuantity,
+                variantAttributes: productVariant.variantAttributes,
+                productImage: productImage
+                  ? {
+                      id: productImage.id,
+                      imageUrl: productImage.imageUrl,
+                    }
+                  : null,
+              }
+            : null,
+        };
+      },
+    );
 
     const result =
       refinedProductResponseData.length === 0
