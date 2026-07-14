@@ -29,7 +29,7 @@ export class CategoryRepository extends Repository<Category> {
    * Finds a category by its ID.
    */
   async findCategoryById(id: string | undefined): Promise<Category | null> {
-    return this.findOne({ where: { id } });
+    return this.findOne({ where: { id: id } });
   }
 
   async findAndCountParentCategories({

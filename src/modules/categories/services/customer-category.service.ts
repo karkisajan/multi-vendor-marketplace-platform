@@ -19,7 +19,7 @@ import { ProductVariant } from 'src/modules/products/entities/product-variant.en
 import { ProductImage } from 'src/modules/products/entities/product-image.entity';
 import { CategoryHelperService } from './category-helper.service';
 import { ProductRating } from 'src/modules/products/entities/product-rating.entity';
-import { SelectQueryBuilder } from 'typeorm';
+import { DataSource, SelectQueryBuilder } from 'typeorm';
 
 type ProductWithRatings = Product & {
   averageRatings: number;
@@ -31,6 +31,8 @@ export class CustomerCategoryService {
     private readonly categoryRepository: CategoryRepository,
     private readonly categoryHelperService: CategoryHelperService,
     private readonly productRepository: ProductRepository,
+
+    private readonly dataSource: DataSource,
     @Inject(CACHE_MANAGER) private readonly cacheManager: Cache,
   ) {}
 
@@ -134,6 +136,21 @@ export class CustomerCategoryService {
     return result;
   }
 
+  private async getThirdLevelCategories(parentId: string): Promise<string[]> {
+    const thirdLevelCategories = await this.categoryRepository
+      .createQueryBuilder('thirdLevelCategory')
+      .innerJoin(
+        Category,
+        'secondLevelCategory',
+        'secondLevelCategory.id = thirdLevelCategory.parentId',
+      )
+      .where('secondLevelCategory.parentId = :parentId', { parentId })
+      .select('thirdLevelCategory.id', 'id')
+      .getRawMany<{ id: string }>();
+
+    return thirdLevelCategories.map((category) => category.id);
+  }
+
   /**
    * Retrieves the product-lists based on provided category.
    */
@@ -213,8 +230,14 @@ export class CustomerCategoryService {
       );
     }
 
+    const categoryIds: string[] =
+      await this.getThirdLevelCategories(categoryId);
+
     productBaseQuery
-      .where('product.status = :status', {
+      .where('product.categoryId IN (:...categoryIds)', {
+        categoryIds: categoryIds,
+      })
+      .andWhere('product.status = :status', {
         status: ProductStatusEnum.PUBLISHED,
       })
       .orderBy('product.createdAt', 'DESC')

@@ -5,6 +5,8 @@ import {
   CreateDateColumn,
   DeleteDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -39,6 +41,15 @@ export class Category {
 
   @Column({ type: 'uuid', nullable: true })
   parentId: string | null;
+
+  @ManyToOne(() => Category, (category) => category.children, {
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'parentId' })
+  parent: Category | null;
+
+  @OneToMany(() => Category, (category) => category.parent)
+  children: Category[];
 
   @OneToMany(() => Product, (product) => product.category, { cascade: true })
   products: Product[];
