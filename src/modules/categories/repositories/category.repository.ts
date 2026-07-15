@@ -83,7 +83,8 @@ export class CategoryRepository extends Repository<Category> {
             'name',
             'slug',
             'imageUrl',
-            'description',
+            'shortDescription',
+            'longDescription',
             'isActive',
             'status',
             'parentId',
@@ -106,7 +107,8 @@ export class CategoryRepository extends Repository<Category> {
   ): Promise<Category> {
     const category = this.create({
       name: createCategoryDto.name,
-      description: createCategoryDto.description,
+      shortDescription: createCategoryDto.shortDescription,
+      longDescription: createCategoryDto.longDescription,
       isActive: createCategoryDto.isActive ?? true,
       status: createCategoryDto.status,
       parentId: createCategoryDto.parentId ?? null,
@@ -127,8 +129,11 @@ export class CategoryRepository extends Repository<Category> {
     if (updateCategoryDto.name !== undefined) {
       updateData.name = updateCategoryDto.name;
     }
-    if (updateCategoryDto.description !== undefined) {
-      updateData.description = updateCategoryDto.description;
+    if (updateCategoryDto.shortDescription !== undefined) {
+      updateData.shortDescription = updateCategoryDto.shortDescription;
+    }
+    if (updateCategoryDto.longDescription !== undefined) {
+      updateData.longDescription = updateCategoryDto.longDescription;
     }
     if (updateCategoryDto.imageUrl !== undefined) {
       updateData.imageUrl = updateCategoryDto.imageUrl;

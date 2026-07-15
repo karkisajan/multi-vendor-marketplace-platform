@@ -35,19 +35,19 @@ export class CustomerCategoryController {
   }
 
   /**
-   * ------ GET - Get products of a category
-   * Retrieves the product-lists based on provided category.
+   * ------ GET - Get products of a category by category slug
+   * Retrieves the product list based on the provided category slug.
    */
-  @Get('/:categoryId/products')
+  @Get('/:slug/products')
   async getProductsOfCategory(
-    @Param('categoryId') categoryId: string,
+    @Param('slug') slug: string,
     @Query('limit') limit: number,
     @Query('cursor') cursor?: string,
   ) {
     return await this.categoryService.getProductsOfCategory({
       limit,
       cursor,
-      categoryId,
+      slug,
     });
   }
 }

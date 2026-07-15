@@ -25,6 +25,7 @@ type ProductWithRatings = Product & {
   averageRatings: number;
   totalReviews: number;
 };
+
 @Injectable()
 export class CustomerCategoryService {
   constructor(
@@ -136,6 +137,13 @@ export class CustomerCategoryService {
     return result;
   }
 
+  /**
+   * Resolves all third-level child categories belonging to a top-level parent category.
+   * Performs an inner join to find sub-categories up to three levels deep.
+   *
+   * @param parentId - The UUID of the parent category.
+   * @returns A promise resolving to an array of child category IDs.
+   */
   private async getThirdLevelCategories(parentId: string): Promise<string[]> {
     const thirdLevelCategories = await this.categoryRepository
       .createQueryBuilder('thirdLevelCategory')
@@ -152,14 +160,16 @@ export class CustomerCategoryService {
   }
 
   /**
-   * Retrieves the product-lists based on provided category.
+   * Retrieves a paginated list of published products for a category based on its slug.
+   * Resolves the category by its slug, gathers third-level child category IDs, and
+   * filters published products belonging to those categories with cursor pagination.
    */
   async getProductsOfCategory({
-    categoryId,
+    slug,
     limit,
     cursor,
   }: {
-    categoryId: string;
+    slug: string;
     limit: number;
     cursor?: string;
   }) {
@@ -169,7 +179,7 @@ export class CustomerCategoryService {
     const normalizedLimit: number = Math.min(limit, 100);
 
     const category: Category | null =
-      await this.categoryRepository.findCategoryById(categoryId);
+      await this.categoryRepository.findCategoryBySlug(slug);
 
     if (!category) {
       throw new NotFoundException('Category not found');
@@ -225,13 +235,14 @@ export class CustomerCategoryService {
         decodeCursor(cursor);
 
       productBaseQuery.andWhere(
-        `(product.createdAt, product.id) < (:cursorCreatedAt, cursorId )`,
+        `(product.createdAt, product.id) < (:cursorCreatedAt, :cursorId)`,
         { cursorCreatedAt: createdAt, cursorId: id },
       );
     }
 
-    const categoryIds: string[] =
-      await this.getThirdLevelCategories(categoryId);
+    const categoryIds: string[] = await this.getThirdLevelCategories(
+      category.id,
+    );
 
     productBaseQuery
       .where('product.categoryId IN (:...categoryIds)', {
@@ -268,53 +279,57 @@ export class CustomerCategoryService {
         )
       : null;
 
-    const refinedProductResponseData = paginatedProductsData.map(
+    const products = paginatedProductsData.map(
       (product: ProductWithRatings) => {
         const productVariant: ProductVariant = product.productVariants[0];
         const productImage: ProductImage = productVariant?.productImages[0];
 
         return {
-          id: product.id,
-          name: product.name,
-          slug: product.slug,
-          createdAt: product.createdAt,
-          averageRatings: product.averageRatings,
-          totalReviews: product.totalReviews,
-          productVariant: productVariant
-            ? {
-                id: productVariant.id,
-                sellingPrice: productVariant.sellingPrice,
-                crossPrice: productVariant.crossPrice,
-                productImage: productImage
-                  ? {
-                      id: productImage.id,
-                      imageUrl: productImage.imageUrl,
-                    }
-                  : null,
-              }
-            : null,
+          id: category.id,
+          name: category.name,
+          shortDescription: category.shortDescription,
+          longDescription: category.longDescription,
+          product: {
+            id: product.id,
+            name: product.name,
+            slug: product.slug,
+            createdAt: product.createdAt,
+            averageRatings: product.averageRatings,
+            totalReviews: product.totalReviews,
+            productVariant: productVariant
+              ? {
+                  id: productVariant.id,
+                  sellingPrice: productVariant.sellingPrice,
+                  crossPrice: productVariant.crossPrice,
+                  productImage: productImage
+                    ? {
+                        id: productImage.id,
+                        imageUrl: productImage.imageUrl,
+                      }
+                    : null,
+                }
+              : null,
+          },
         };
       },
     );
 
-    const result =
-      refinedProductResponseData.length === 0
-        ? {
-            message: 'No products found for this category.',
-            data: [],
-            meta: {
-              hasNextPage: hasNextPage,
-              nextPageCursor: nextPageCursor,
-            },
-          }
-        : {
-            message: `Products fetched successfully.`,
-            data: refinedProductResponseData,
-            meta: {
-              hasNextPage: hasNextPage,
-              nextPageCursor: nextPageCursor,
-            },
-          };
+    const result = {
+      message:
+        products.length === 0
+          ? 'No products found for this category'
+          : 'Products fetched successfully.',
+
+      id: category.id,
+      name: category.name,
+      shortDescription: category.shortDescription,
+      longDescription: category.longDescription,
+      products: products,
+      meta: {
+        hasNextPage: hasNextPage,
+        nextPageCursor: nextPageCursor,
+      },
+    };
 
     return result;
   }

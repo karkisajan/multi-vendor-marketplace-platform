@@ -58,9 +58,7 @@ async function seedRatings(): Promise<void> {
   });
 
   if (customers.length === 0) {
-    console.warn(
-      'No customers found. Please run the user seed script first!',
-    );
+    console.warn('No customers found. Please run the user seed script first!');
     return;
   }
 

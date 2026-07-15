@@ -23,8 +23,11 @@ export class Category {
   @Column({ nullable: false, unique: true })
   slug: string;
 
-  @Column({ nullable: true })
-  description: string;
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  shortDescription: string | null;
+
+  @Column({ type: 'text', nullable: true })
+  longDescription: string | null;
 
   @Column({ nullable: true })
   imageUrl: string;

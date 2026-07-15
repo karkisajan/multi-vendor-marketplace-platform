@@ -1,4 +1,9 @@
-import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { join } from 'path';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter';

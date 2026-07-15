@@ -23,18 +23,29 @@ export class CreateCategoryDto {
   })
   name: string;
 
-  /* Extended text displayed on the category landing page */
+  /* Short summary of the category (maximum 255 characters) */
   @ApiProperty({
     example: 'Gadgets, devices, and accessories',
-    description: 'Description of the category',
+    description: 'Short description of the category',
     required: false,
   })
   @IsOptional()
-  @IsString({ message: 'Please provide a valid category description.' })
-  @MaxLength(500, {
-    message: 'The description should not exceed 500 characters.',
+  @IsString({ message: 'Please provide a valid category short description.' })
+  @MaxLength(255, {
+    message: 'The short description should not exceed 255 characters.',
   })
-  description?: string;
+  shortDescription?: string;
+
+  /* Detailed text displayed on the category landing page */
+  @ApiProperty({
+    example:
+      'A longer, detailed description of the category contents, specifications, and selection...',
+    description: 'Long description of the category',
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: 'Please provide a valid category long description.' })
+  longDescription?: string;
 
   /* CDN URL for the category thumbnail image */
   @ApiProperty({
