@@ -55,7 +55,7 @@ export class CustomerProductService {
     limit,
     cursor,
     search,
-    categorySlug,
+    categoryId,
     minPrice,
     maxPrice,
     datePosted,
@@ -63,7 +63,7 @@ export class CustomerProductService {
     limit: number;
     cursor?: string;
     search?: string;
-    categorySlug?: string;
+    categoryId?: string;
     minPrice?: number;
     maxPrice?: number;
     datePosted?: DatePostedTypeEnum;
@@ -79,7 +79,7 @@ export class CustomerProductService {
         limit: normalizedLimit,
         cursor: cursor,
         search: search,
-        categorySlug: categorySlug,
+        categoryId: categoryId,
         minPrice: minPrice,
         maxPrice: maxPrice,
         datePosted: datePosted,
@@ -93,7 +93,6 @@ export class CustomerProductService {
 
     const productBaseQuery: SelectQueryBuilder<Product> = this.productRepository
       .createQueryBuilder('product')
-      .leftJoin('product.category', 'category')
       .leftJoin(
         'product.productVariants',
         'productVariant',
@@ -148,9 +147,9 @@ export class CustomerProductService {
     /**
      * Filter products by selected category (CategorySlug)
      */
-    if (categorySlug) {
-      productBaseQuery.andWhere('category.slug = :categorySlug', {
-        categorySlug: categorySlug,
+    if (categoryId) {
+      productBaseQuery.andWhere('product.categoryId = :categoryId', {
+        categoryId: categoryId,
       });
     }
 

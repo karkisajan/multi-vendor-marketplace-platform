@@ -165,13 +165,17 @@ export class CustomerCategoryService {
    * filters published products belonging to those categories with cursor pagination.
    */
   async getProductsOfCategory({
-    slug,
     limit,
     cursor,
+    slug,
+    categoryId,
+    search,
   }: {
     slug: string;
     limit: number;
     cursor?: string;
+    categoryId?: string;
+    search?: string;
   }) {
     if (isNaN(Number(limit)) || limit <= 0) {
       throw new BadRequestException('Limit should be of positive integer.');
@@ -230,6 +234,21 @@ export class CustomerCategoryService {
         'totalReviews',
       );
 
+    if (categoryId) {
+      productBaseQuery.andWhere('product.categoryId = :categoryId', {
+        categoryId: categoryId,
+      });
+    }
+
+    if (search) {
+      productBaseQuery.andWhere(
+        `(product.name ILIKE :search OR product.description ILIKE :search)`,
+        {
+          search: `%${search}%`,
+        },
+      );
+    }
+
     if (cursor) {
       const { createdAt, id }: { createdAt: string; id: string } =
         decodeCursor(cursor);
@@ -245,7 +264,7 @@ export class CustomerCategoryService {
     );
 
     productBaseQuery
-      .where('product.categoryId IN (:...categoryIds)', {
+      .andWhere('product.categoryId IN (:...categoryIds)', {
         categoryIds: categoryIds,
       })
       .andWhere('product.status = :status', {
@@ -285,31 +304,25 @@ export class CustomerCategoryService {
         const productImage: ProductImage = productVariant?.productImages[0];
 
         return {
-          id: category.id,
-          name: category.name,
-          shortDescription: category.shortDescription,
-          longDescription: category.longDescription,
-          product: {
-            id: product.id,
-            name: product.name,
-            slug: product.slug,
-            createdAt: product.createdAt,
-            averageRatings: product.averageRatings,
-            totalReviews: product.totalReviews,
-            productVariant: productVariant
-              ? {
-                  id: productVariant.id,
-                  sellingPrice: productVariant.sellingPrice,
-                  crossPrice: productVariant.crossPrice,
-                  productImage: productImage
-                    ? {
-                        id: productImage.id,
-                        imageUrl: productImage.imageUrl,
-                      }
-                    : null,
-                }
-              : null,
-          },
+          id: product.id,
+          name: product.name,
+          slug: product.slug,
+          createdAt: product.createdAt,
+          averageRatings: product.averageRatings,
+          totalReviews: product.totalReviews,
+          productVariant: productVariant
+            ? {
+                id: productVariant.id,
+                sellingPrice: productVariant.sellingPrice,
+                crossPrice: productVariant.crossPrice,
+                productImage: productImage
+                  ? {
+                      id: productImage.id,
+                      imageUrl: productImage.imageUrl,
+                    }
+                  : null,
+              }
+            : null,
         };
       },
     );

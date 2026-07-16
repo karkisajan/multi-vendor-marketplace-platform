@@ -43,11 +43,15 @@ export class CustomerCategoryController {
     @Param('slug') slug: string,
     @Query('limit') limit: number,
     @Query('cursor') cursor?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('search') search?: string,
   ) {
     return await this.categoryService.getProductsOfCategory({
       limit,
       cursor,
       slug,
+      categoryId,
+      search,
     });
   }
 }
