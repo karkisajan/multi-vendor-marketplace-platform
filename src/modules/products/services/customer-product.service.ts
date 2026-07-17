@@ -138,8 +138,7 @@ export class CustomerProductService {
 
     if (search?.trim()) {
       productBaseQuery.andWhere(
-        `(product.name ILIKE :search OR product.description ILIKE :search OR 
-          category.name ILIKE :search)`,
+        `(product.name ILIKE :search OR product.description ILIKE :search)`,
         { search: `%${search}%` },
       );
     }

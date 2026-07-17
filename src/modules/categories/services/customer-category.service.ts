@@ -115,6 +115,7 @@ export class CustomerCategoryService {
     const result =
       totalCategories === 0
         ? {
+            message: 'No parent categories found.',
             data: [],
             meta: {
               page: normalizedPage,
@@ -124,6 +125,7 @@ export class CustomerCategoryService {
             },
           }
         : {
+            message: 'Parent categories fetched successfully.',
             data: categories,
             meta: {
               page: normalizedPage,
