@@ -79,7 +79,7 @@ export class CustomerProductController {
   }
 
   /**
-   * ------ POST - Create product rating (Customer)
+   * ------ POST - Create product rating (Customer
    * Submits a score and optional comment for a published product.
    * Rejects duplicates — each customer can rate a product only once.
    */
