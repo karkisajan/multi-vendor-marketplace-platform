@@ -153,22 +153,22 @@ export class CustomerProductService {
     }
 
     /* Filter products by min and max price */
-    if (minPrice !== undefined || maxPrice !== undefined) {
-      if (minPrice !== undefined && maxPrice !== undefined) {
-        productBaseQuery.andWhere(
-          `(productVariant.sellingPrice BETWEEN :minPrice AND :maxPrice)`,
-          { minPrice: minPrice, maxPrice: maxPrice },
-        );
-      } else if (minPrice !== undefined) {
-        productBaseQuery.andWhere('productVariant.sellingPrice >= :minPrice', {
-          minPrice: minPrice,
-        });
-      } else if (maxPrice !== undefined) {
-        productBaseQuery.andWhere('productVariant.sellingPrice <= :maxPrice', {
-          maxPrice: maxPrice,
-        });
-      }
-    }
+    // if (minPrice !== undefined || maxPrice !== undefined) {
+    //   if (minPrice !== undefined && maxPrice !== undefined) {
+    //     productBaseQuery.andWhere(
+    //       `(productVariant.sellingPrice BETWEEN :minPrice AND :maxPrice)`,
+    //       { minPrice: minPrice, maxPrice: maxPrice },
+    //     );
+    //   } else if (minPrice !== undefined) {
+    //     productBaseQuery.andWhere('productVariant.sellingPrice >= :minPrice', {
+    //       minPrice: minPrice,
+    //     });
+    //   } else if (maxPrice !== undefined) {
+    //     productBaseQuery.andWhere('productVariant.sellingPrice <= :maxPrice', {
+    //       maxPrice: maxPrice,
+    //     });
+    //   }
+    // }
 
     /**
      * Filter by datePosted (last 24 hours, 7 days, 15 days and 30 days)
